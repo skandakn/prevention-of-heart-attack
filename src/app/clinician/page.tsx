@@ -1,0 +1,150 @@
+"use client";
+
+import { useState } from "react";
+import { generatePatients } from "@/lib/isi/simulation";
+import { useSubscription } from "@/lib/subscription/SubscriptionContext";
+import { Paywall } from "@/components/ui/Paywall";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { DisclaimerBanner } from "@/components/layout/Footer";
+import { SimulatedBadge } from "@/components/layout/Toast";
+import { cn, getTrendLabel } from "@/lib/utils";
+import { ISIGauge } from "@/components/isi/ISIGauge";
+import { ContributionBars } from "@/components/isi/ContributionBars";
+import { ISITrendChart } from "@/components/charts/ISITrendChart";
+import { BaselineCard } from "@/components/isi/BaselineCard";
+import { Download, ChevronRight } from "lucide-react";
+import type { PatientRecord } from "@/lib/isi/types";
+import { MEDICAL_DISCLAIMER } from "@/lib/isi/types";
+
+export default function ClinicianPage() {
+  const { canAccessFeature } = useSubscription();
+  const [patients] = useState<PatientRecord[]>(() => generatePatients());
+  const [selected, setSelected] = useState<PatientRecord | null>(() => patients[0] ?? null);
+
+  const hasAccess = canAccessFeature("ADVANCED_ANALYTICS");
+
+  const exportReport = () => {
+    const report = {
+      generated: new Date().toISOString(),
+      patient: selected?.id ?? "All",
+      disclaimer: MEDICAL_DISCLAIMER,
+      note: "Clinical decision support prototype — not a diagnostic system.",
+      data: selected ?? patients,
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `beatahead-report-${selected?.id ?? "all"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const content = (
+    <div className="p-4 lg:p-8 space-y-6 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-navy-900">Clinician Dashboard</h1>
+          <p className="text-sm text-navy-500">Clinical decision support prototype</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <SimulatedBadge />
+          <Button onClick={exportReport} variant="outline" size="sm" className="gap-2">
+            <Download className="w-4 h-4" /> Export Report
+          </Button>
+        </div>
+      </div>
+
+      <DisclaimerBanner />
+
+      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800">
+        Clinical decision support prototype — not a diagnostic system. Supports clinical follow-up.
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Patient list */}
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-base">Patient List</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-navy-100">
+              {patients.map((patient) => (
+                <button
+                  key={patient.id}
+                  onClick={() => setSelected(patient)}
+                  className={cn(
+                    "w-full flex items-center justify-between px-4 py-3 text-left hover:bg-navy-50 transition-colors",
+                    selected?.id === patient.id && "bg-navy-50 border-l-2 border-navy-900"
+                  )}
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-navy-900">{patient.id}</p>
+                    <p className="text-xs text-navy-500">ISI: {patient.currentISI} · {getTrendLabel(patient.trend)}</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-navy-400" />
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Patient detail */}
+        <div className="lg:col-span-2 space-y-6">
+          {selected ? (
+            <>
+              <div className="grid sm:grid-cols-4 gap-3">
+                {[
+                  { label: "Current ISI", value: selected.currentISI },
+                  { label: "Trend", value: getTrendLabel(selected.trend) },
+                  { label: "Signal Quality", value: `${Math.round(selected.signalQuality)}%` },
+                  { label: "Last Updated", value: selected.lastUpdated },
+                ].map((s) => (
+                  <div key={s.label} className="p-3 rounded-lg bg-white border border-navy-100">
+                    <p className="text-[10px] text-navy-400">{s.label}</p>
+                    <p className="text-lg font-bold text-navy-900">{s.value}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="grid lg:grid-cols-2 gap-6">
+                <div className="rounded-xl border border-navy-100 bg-white p-6">
+                  <ISIGauge
+                    score={selected.currentISI}
+                    baseline={selected.baseline.isi}
+                    trend={selected.trend}
+                    confidence={selected.scores.at(-1)?.confidence ?? 86}
+                  />
+                </div>
+                <BaselineCard
+                  title="Patient Baseline"
+                  baseline={selected.baseline}
+                  sample={selected.lastSample}
+                  features={selected.features}
+                />
+              </div>
+              <ISITrendChart history={selected.scores} baselineIsi={selected.baseline.isi} />
+              <ContributionBars contributions={selected.scores.at(-1)?.contributions} />
+            </>
+          ) : (
+            <div className="flex items-center justify-center h-64 rounded-xl border border-dashed border-navy-200 bg-navy-50/50">
+              <p className="text-sm text-navy-500">Select a patient to view details</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  if (!hasAccess) {
+    return (
+      <div className="p-4 lg:p-8 max-w-7xl mx-auto">
+        <Paywall featureName="Clinician Dashboard & Multi-Patient Analytics">
+          {content}
+        </Paywall>
+      </div>
+    );
+  }
+
+  return content;
+}
