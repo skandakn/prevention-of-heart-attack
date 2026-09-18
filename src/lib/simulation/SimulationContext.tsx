@@ -224,7 +224,7 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
     () => ({
       aiEngine: "online",
       sensorStream: "simulated",
-      signalProcessing: isRunning ? "active" : "standby",
+      signalProcessing: isRunning ? "active" : "inactive",
       isiEngine: "active",
       dataSync: "connected",
     }),
