@@ -5,7 +5,8 @@ import { BeatAheadAuthProvider } from "@/lib/auth/ClerkAuthWrapper";
 import { SimulationProvider } from "@/lib/simulation/SimulationContext";
 import { SubscriptionProvider } from "@/lib/subscription/SubscriptionContext";
 import { DemoBanner } from "@/components/layout/DemoBanner";
-import { Sidebar, MobileNav, AppHeader } from "@/components/layout/Sidebar";
+import { Sidebar, MobileNav } from "@/components/layout/Sidebar";
+import { AppContentWrapper } from "@/components/layout/AppContentWrapper";
 import { Toast } from "@/components/layout/Toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CardiacVoiceWidget } from "@/components/voice/CardiacVoiceWidget";
@@ -47,10 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <TooltipProvider>
                 <DemoBanner />
                 <Sidebar />
-                <div className="lg:pl-64">
-                  <AppHeader />
-                  <main className="min-h-screen pb-20 lg:pb-0">{children}</main>
-                </div>
+                <AppContentWrapper>{children}</AppContentWrapper>
                 <MobileNav />
                 <Toast />
                 <CardiacVoiceWidget />

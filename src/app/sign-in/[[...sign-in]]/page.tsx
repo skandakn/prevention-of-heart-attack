@@ -7,6 +7,7 @@ import { SignIn } from "@clerk/nextjs";
 import { Heart, Mail, Lock, User, Check, X, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { checkIsClerkConfigured, useBeatAheadAuth } from "@/lib/auth/ClerkAuthWrapper";
+import { SplineBackground } from "@/components/ui/SplineBackground";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -59,10 +60,12 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-navy-950 px-4 py-12 text-white relative">
+    <div className="min-h-screen flex items-center justify-center bg-[#030712] px-4 py-12 text-white relative overflow-hidden">
+      <SplineBackground />
+
       {/* If already signed in, show Sign Out banner card */}
       {isSignedIn && (
-        <div className="absolute top-6 right-6 z-50 bg-navy-900 border border-navy-800 rounded-xl p-3 flex items-center gap-3 shadow-xl">
+        <div className="absolute top-6 right-6 z-50 bg-navy-900/90 border border-white/10 rounded-xl p-3 flex items-center gap-3 shadow-xl backdrop-blur-md">
           <div className="text-left text-xs">
             <div className="font-semibold text-white">{user?.fullName || "Signed In"}</div>
             <div className="text-navy-400 text-[11px]">{user?.email}</div>
@@ -79,7 +82,7 @@ export default function SignInPage() {
         </div>
       )}
 
-      <div className="w-full max-w-md bg-navy-900/90 border border-navy-800/80 backdrop-blur-xl rounded-2xl shadow-2xl p-6 sm:p-8 flex flex-col items-center text-center">
+      <div className="relative z-10 w-full max-w-md bg-navy-900/85 border border-white/10 backdrop-blur-2xl rounded-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] p-6 sm:p-8 flex flex-col items-center text-center">
         {/* BeatAhead Logo */}
         <Link href="/" className="inline-flex items-center gap-2.5 mb-6 group">
           <div className="w-9 h-9 rounded-xl bg-cardiac flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
