@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+import { filterAcousticEcho } from '@/core/utils/echo-filter';
+
 export default function HelplinePage() {
   const [activeTab, setActiveTab] = useState<'voice' | 'phone'>('voice');
   const [isConnected, setIsConnected] = useState(false);
@@ -46,25 +48,20 @@ export default function HelplinePage() {
 
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const lastAudioEndTimeRef = useRef<number>(0);
+  const recentAssistantTextsRef = useRef<string[]>([
+    'Hello, this is the BeatAhead Cardiac Care Helpline. I am here with you.',
+  ]);
+  const isConnectedRef = useRef(false);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  // Call timer
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isConnected) {
-      interval = setInterval(() => setCallDuration((prev) => prev + 1), 1000);
-    } else {
-      setCallDuration(0);
-    }
-    return () => clearInterval(interval);
+    isConnectedRef.current = isConnected;
   }, [isConnected]);
-
-  useEffect(() => {
-    transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [transcripts]);
 
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60).toString().padStart(2, '0');
@@ -72,21 +69,74 @@ export default function HelplinePage() {
     return `${m}:${s}`;
   };
 
+  const stopCurrentAudio = () => {
+    audioQueueRef.current = [];
+    if (currentAudioRef.current) {
+      try {
+        currentAudioRef.current.pause();
+        currentAudioRef.current.currentTime = 0;
+        currentAudioRef.current.onended = null;
+        currentAudioRef.current.onerror = null;
+      } catch {}
+      currentAudioRef.current = null;
+    }
+    isPlayingRef.current = false;
+    setIsSpeaking(false);
+  };
+
+  const safeAbortRecognition = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {}
+    }
+    setIsListening(false);
+  };
+
+  const safeStartRecognition = () => {
+    if (!recognitionRef.current || !isConnectedRef.current || isPlayingRef.current) return;
+    try {
+      recognitionRef.current.start();
+      setIsListening(true);
+    } catch {}
+  };
+
   const playNextAudio = () => {
     if (audioQueueRef.current.length === 0) {
       isPlayingRef.current = false;
       setIsSpeaking(false);
+      lastAudioEndTimeRef.current = Date.now();
+      setTimeout(() => {
+        if (!isPlayingRef.current && isConnectedRef.current) {
+          safeStartRecognition();
+        }
+      }, 600);
       return;
     }
 
     isPlayingRef.current = true;
     setIsSpeaking(true);
+    safeAbortRecognition();
+
     const base64Audio = audioQueueRef.current.shift()!;
     const audio = new Audio(`data:audio/mpeg;base64,${base64Audio}`);
+    currentAudioRef.current = audio;
 
-    audio.onended = () => playNextAudio();
-    audio.onerror = () => playNextAudio();
-    audio.play().catch(() => playNextAudio());
+    audio.onended = () => {
+      currentAudioRef.current = null;
+      lastAudioEndTimeRef.current = Date.now();
+      playNextAudio();
+    };
+    audio.onerror = () => {
+      currentAudioRef.current = null;
+      lastAudioEndTimeRef.current = Date.now();
+      playNextAudio();
+    };
+    audio.play().catch(() => {
+      currentAudioRef.current = null;
+      lastAudioEndTimeRef.current = Date.now();
+      playNextAudio();
+    });
   };
 
   const queueAudio = (base64: string) => {
@@ -137,6 +187,7 @@ export default function HelplinePage() {
   };
 
   const endSession = async () => {
+    stopCurrentAudio();
     stopSpeechRecognition();
     if (callId) {
       try {
@@ -165,25 +216,36 @@ export default function HelplinePage() {
         recognition.interimResults = false;
         recognition.lang = 'en-US';
 
-        recognition.onstart = () => setIsListening(true);
+        recognition.onstart = () => {
+          if (!isPlayingRef.current) setIsListening(true);
+        };
         recognition.onresult = (e: any) => {
+          if (isPlayingRef.current || Date.now() - lastAudioEndTimeRef.current < 600) {
+            return;
+          }
           const last = e.results[e.results.length - 1];
           if (last.isFinal) {
             const text = last[0].transcript.trim();
-            if (text && !isPlayingRef.current) {
+            if (text) {
               handleSendUtterance(text, activeCallId);
             }
           }
         };
         recognition.onend = () => {
-          if (isConnected && !isPlayingRef.current) {
-            try {
-              recognition.start();
-            } catch {}
+          if (isConnectedRef.current && !isPlayingRef.current) {
+            setTimeout(() => {
+              if (isConnectedRef.current && !isPlayingRef.current) {
+                try {
+                  recognition.start();
+                } catch {}
+              }
+            }, 400);
           }
         };
 
-        recognition.start();
+        try {
+          recognition.start();
+        } catch {}
         recognitionRef.current = recognition;
         return;
       } catch (err) {}
@@ -199,13 +261,13 @@ export default function HelplinePage() {
           setIsListening(true);
 
           recorder.ondataavailable = async (e) => {
-            if (e.data.size > 0) {
+            if (e.data.size > 0 && !isPlayingRef.current) {
               audioChunksRef.current.push(e.data);
             }
           };
 
           recorder.onstop = async () => {
-            if (audioChunksRef.current.length > 0) {
+            if (audioChunksRef.current.length > 0 && !isPlayingRef.current) {
               const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
               audioChunksRef.current = [];
               const formData = new FormData();
@@ -230,12 +292,7 @@ export default function HelplinePage() {
   };
 
   const stopSpeechRecognition = () => {
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch {}
-      recognitionRef.current = null;
-    }
+    safeAbortRecognition();
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       try {
         mediaRecorderRef.current.stop();
@@ -248,12 +305,25 @@ export default function HelplinePage() {
 
   const handleSendUtterance = async (text: string, currentCallId = callId) => {
     if (!text.trim()) return;
+    const clean = text.trim();
+
+    // Check acoustic echo
+    const echoCheck = filterAcousticEcho(clean, recentAssistantTextsRef.current);
+    if (echoCheck.isFullEcho) {
+      console.log('[Helpline Echo Filter] Discarded assistant echo:', clean);
+      return;
+    }
+
+    const textToSend = echoCheck.isPartialEcho ? echoCheck.cleanedText : clean;
+    if (!textToSend || textToSend.length < 2) return;
+
+    stopCurrentAudio();
 
     setTranscripts((prev) => [
       ...prev,
       {
         speaker: 'patient',
-        text,
+        text: textToSend,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
@@ -267,7 +337,7 @@ export default function HelplinePage() {
         body: JSON.stringify({
           action: 'utterance',
           callId: currentCallId,
-          message: text,
+          message: textToSend,
         }),
       });
 
@@ -275,6 +345,10 @@ export default function HelplinePage() {
       setIsThinking(false);
 
       if (data.success) {
+        if (data.responseText) {
+          recentAssistantTextsRef.current.push(data.responseText);
+        }
+
         setTranscripts((prev) => [
           ...prev,
           {

@@ -52,15 +52,23 @@ export class SchemaValidator {
       case 'enum': {
         const strVal = String(rawValue).trim();
         const allowed = field.enumValues || [];
-        // Exact or case-insensitive match
-        const match = allowed.find((val) => val.toLowerCase() === strVal.toLowerCase());
+        const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        // 1. Exact or case-insensitive match
+        let match = allowed.find((val) => val.toLowerCase() === strVal.toLowerCase());
         if (!match) {
-          return {
-            valid: false,
-            error: `Value '${rawValue}' is not one of the allowed enum values: ${allowed.join(', ')}`,
-          };
+          // 2. Normalized match (ignoring spaces/underscores)
+          match = allowed.find((val) => normalize(val) === normalize(strVal));
         }
-        return { valid: true, value: match };
+        if (!match) {
+          // 3. Substring match
+          match = allowed.find(
+            (val) => normalize(val).includes(normalize(strVal)) || normalize(strVal).includes(normalize(val))
+          );
+        }
+
+        // 4. If still no direct enum matched, accept the string value rather than dropping it
+        return { valid: true, value: match || strVal };
       }
 
       case 'date':

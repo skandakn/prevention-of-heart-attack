@@ -203,22 +203,29 @@ export class VoiceAgent {
       });
     }
 
-    // 3. CRITICAL: Non-blocking parallel extraction dispatch
+    // 3 & 4. Concurrent execution: Conversation Agent response + Structured Data Extraction pass
     const extractor = this.activeExtractors.get(callId);
     if (extractor) {
       extractor.enqueueUtterance(trimmedText);
     }
 
-    // 4. Conversation agent generates spoken reply
     const conversation = this.activeConversations.get(callId);
     if (!conversation) {
       throw new Error(`Active conversation for ${callId} not found.`);
     }
 
-    const { responseText, toolExecutions } = await conversation.processCallerUtterance(
-      trimmedText,
-      session
-    );
+    // Run conversational generation and extraction concurrently
+    const [conversationResult] = await Promise.all([
+      conversation.processCallerUtterance(trimmedText, session),
+      extractor
+        ? Promise.race([
+            extractor.flush(),
+            new Promise((resolve) => setTimeout(resolve, 4000)), // timeout safeguard
+          ])
+        : Promise.resolve(),
+    ]);
+
+    const { responseText, toolExecutions } = conversationResult;
 
     // Add assistant item to transcript
     const assistantItem: TranscriptItem = {
