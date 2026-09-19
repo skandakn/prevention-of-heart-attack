@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const links = [
+  { href: "/helpline", label: "24/7 AI Helpline", badge: true },
   { href: "/pricing", label: "Pricing" },
   { href: "/methodology", label: "Methodology" },
   { href: "/about", label: "About" },

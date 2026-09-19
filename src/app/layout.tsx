@@ -8,6 +8,7 @@ import { DemoBanner } from "@/components/layout/DemoBanner";
 import { Sidebar, MobileNav, AppHeader } from "@/components/layout/Sidebar";
 import { Toast } from "@/components/layout/Toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { CardiacVoiceWidget } from "@/components/voice/CardiacVoiceWidget";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -52,6 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </div>
                 <MobileNav />
                 <Toast />
+                <CardiacVoiceWidget />
               </TooltipProvider>
             </SimulationProvider>
           </SubscriptionProvider>

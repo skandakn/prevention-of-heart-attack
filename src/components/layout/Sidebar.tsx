@@ -17,6 +17,8 @@ import {
   BookOpen,
   Info,
   CreditCard,
+  PhoneCall,
+  FileText,
   LogIn,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,6 +31,8 @@ import { Button } from "@/components/ui/button";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/helpline", label: "Cardiac Helpline", icon: PhoneCall },
+  { href: "/calls", label: "Call Records", icon: FileText },
   { href: "/monitor", label: "Live Monitor", icon: Radio },
   { href: "/signals", label: "Signals", icon: Activity },
   { href: "/trends", label: "Trends", icon: BarChart3 },
