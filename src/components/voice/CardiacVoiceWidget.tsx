@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { filterAcousticEcho } from '@/core/utils/echo-filter';
+import { extractCardiacFindings } from '@/core/extraction/deterministic-extractor';
 
 interface SymptomState {
   value: any;
@@ -129,18 +130,18 @@ export function CardiacVoiceWidget() {
       setIsSpeaking(false);
       lastAudioEndTimeRef.current = Date.now();
 
-      // Buffer 600ms after speaker audio stops before restarting speech recognition
+      // Buffer 800ms after speaker audio stops before restarting speech recognition
       setTimeout(() => {
         if (!isPlayingRef.current && isConnectedRef.current) {
           safeStartRecognition();
         }
-      }, 600);
+      }, 800);
       return;
     }
 
     isPlayingRef.current = true;
     setIsSpeaking(true);
-    safeAbortRecognition(); // MUST abort microphone capture while speaker is playing!
+    safeAbortRecognition(); // Abort microphone capture while speaker is playing!
 
     const base64Audio = audioQueueRef.current.shift()!;
     const audio = new Audio(`data:audio/mpeg;base64,${base64Audio}`);
@@ -193,6 +194,18 @@ export function CardiacVoiceWidget() {
 
       // Stop any lingering audio immediately upon user speaking
       stopCurrentAudio();
+
+      // 0ms instant client-side deterministic symptom extraction
+      const instant = extractCardiacFindings(cleanText, extractedData);
+      if (Object.keys(instant).length > 0) {
+        setExtractedData((prev) => ({ ...prev, ...instant }));
+        const urg = instant.urgency_level?.value;
+        if (urg === 'CRITICAL_EMERGENCY' || String(urg).toLowerCase().includes('critical')) {
+          setUrgencyBadge('CRITICAL EMERGENCY');
+        } else if (urg === 'HIGH_RISK_URGENT' || String(urg).toLowerCase().includes('high')) {
+          setUrgencyBadge('HIGH RISK');
+        }
+      }
 
       setTranscripts((prev) => [
         ...prev,
@@ -261,7 +274,7 @@ export function CardiacVoiceWidget() {
         setStatusMessage('Error processing turn: ' + err.message);
       }
     },
-    [callId, queueAudio, stopCurrentAudio]
+    [callId, extractedData, queueAudio, stopCurrentAudio]
   );
 
   // Microphone capture setup
@@ -286,8 +299,8 @@ export function CardiacVoiceWidget() {
           };
 
           recognition.onresult = (event: any) => {
-            // Guard: completely ignore if audio is playing or just finished playing
-            if (isPlayingRef.current || Date.now() - lastAudioEndTimeRef.current < 600) {
+            // Guard: strictly ignore if audio is playing or ended within 800ms
+            if (isPlayingRef.current || Date.now() - lastAudioEndTimeRef.current < 800) {
               console.log('[Widget] Discarded speech during speaker audio playback');
               return;
             }
@@ -308,9 +321,9 @@ export function CardiacVoiceWidget() {
           };
 
           recognition.onend = () => {
-            if (isConnectedRef.current && !isPlayingRef.current) {
+            if (isConnectedRef.current && !isPlayingRef.current && Date.now() - lastAudioEndTimeRef.current >= 800) {
               setTimeout(() => {
-                if (isConnectedRef.current && !isPlayingRef.current) {
+                if (isConnectedRef.current && !isPlayingRef.current && Date.now() - lastAudioEndTimeRef.current >= 800) {
                   try {
                     recognition.start();
                   } catch {}
@@ -319,9 +332,12 @@ export function CardiacVoiceWidget() {
             }
           };
 
-          try {
-            recognition.start();
-          } catch {}
+          // Only start microphone capture immediately if speaker audio is NOT playing
+          if (!isPlayingRef.current && Date.now() - lastAudioEndTimeRef.current >= 800) {
+            try {
+              recognition.start();
+            } catch {}
+          }
           recognitionRef.current = recognition;
           return;
         } catch (e) {
@@ -413,6 +429,12 @@ export function CardiacVoiceWidget() {
           "Hello, this is the BeatAhead Cardiac Care Helpline. I'm here with you. Are you or someone near you experiencing chest discomfort, breathlessness, or unusual heart symptoms?";
 
         recentAssistantTextsRef.current.push(greeting);
+        recentAssistantTextsRef.current.push(
+          "Hello, this is the BeatAhead Cardiac Care Helpline. I'm here with you. Are you or someone near you experiencing chest discomfort, breathlessness, or unusual heart symptoms?"
+        );
+        recentAssistantTextsRef.current.push(
+          "Hello, this is the Beta Head Cardiac Care Helpline. I'm here with you. Are you or someone near you experiencing chest discomfort, breathlessness, or unusual heart symptoms?"
+        );
 
         setTranscripts([
           {
@@ -555,49 +577,51 @@ export function CardiacVoiceWidget() {
           </div>
 
           {/* Extracted Symptom Ticker */}
-          <div className="border-b border-slate-800 bg-slate-900/60 px-3 py-2.5">
-            <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
-              <span className="font-semibold flex items-center gap-1.5 text-slate-300">
-                <Activity className="h-3 w-3 text-red-400" /> Extracted Clinical Findings:
+          <div className="border-b border-slate-800 bg-slate-900/80 px-3.5 py-2.5">
+            <div className="flex items-center justify-between text-[11px] text-slate-300 mb-1.5 font-semibold">
+              <span className="flex items-center gap-1.5">
+                <Activity className="h-3.5 w-3.5 text-red-500 animate-pulse" /> Extracted Clinical Findings:
               </span>
               {extractedData.urgency_level?.value && (
-                <span className="text-[10px] font-bold text-red-400 uppercase tracking-wide">
+                <span className="rounded bg-red-600/30 border border-red-500/40 px-2 py-0.5 text-[10px] font-extrabold text-red-300 tracking-wide uppercase">
                   {String(extractedData.urgency_level.value).replace(/_/g, ' ')}
                 </span>
               )}
             </div>
             {hasAnyFindings ? (
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.5 mt-1">
                 {extractedData.primary_symptom?.value && (
-                  <span className="inline-flex items-center gap-1 rounded bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-300 border border-rose-500/30">
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-red-600/25 px-2.5 py-1 text-[11px] font-bold text-red-200 border border-red-500/40 shadow-sm">
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
                     Symptom: {String(extractedData.primary_symptom.value).replace(/_/g, ' ')}
                   </span>
                 )}
                 {extractedData.pain_severity_scale?.value && (
-                  <span className="inline-flex items-center gap-1 rounded bg-rose-500/20 px-2 py-0.5 text-[10px] font-semibold text-rose-300 border border-rose-500/30">
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-500/20 px-2.5 py-1 text-[11px] font-bold text-amber-300 border border-amber-500/40 shadow-sm">
                     Pain: {extractedData.pain_severity_scale.value}/10
                   </span>
                 )}
                 {extractedData.symptom_onset_minutes?.value && (
-                  <span className="inline-flex items-center gap-1 rounded bg-blue-500/20 px-2 py-0.5 text-[10px] font-medium text-blue-300 border border-blue-500/30">
-                    <Clock className="h-2.5 w-2.5" /> Onset: {extractedData.symptom_onset_minutes.value}m
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-500/20 px-2.5 py-1 text-[11px] font-semibold text-blue-300 border border-blue-500/40 shadow-sm">
+                    <Clock className="h-3 w-3" /> Onset: {extractedData.symptom_onset_minutes.value}m
                   </span>
                 )}
                 {extractedData.patient_age?.value && (
-                  <span className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-300 border border-slate-700">
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-200 border border-slate-700">
                     Age: {extractedData.patient_age.value}y
                   </span>
                 )}
                 {extractedData.prior_cardiac_history?.value && (
-                  <span className="inline-flex items-center gap-1 rounded bg-purple-500/20 px-2 py-0.5 text-[10px] font-medium text-purple-300 border border-purple-500/30">
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-purple-500/20 px-2.5 py-1 text-[11px] font-semibold text-purple-300 border border-purple-500/40">
                     History: {String(extractedData.prior_cardiac_history.value)}
                   </span>
                 )}
               </div>
             ) : (
-              <p className="text-[11px] text-slate-500 italic">
+              <p className="text-[11px] text-slate-400 font-medium italic flex items-center gap-1.5 mt-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-400/80 animate-ping" />
                 {isConnected
-                  ? 'Listening for chest discomfort, pain scale, and duration...'
+                  ? 'Listening for acute chest pain, pain scale (1-10), and duration...'
                   : 'Start call to begin clinical symptom extraction.'}
               </p>
             )}

@@ -1,3 +1,4 @@
+import { extractCardiacFindings } from '../extraction/deterministic-extractor';
 import { VoiceAgentConfig } from '../types/config';
 import { CallSession, CallSummary, CallMode } from '../types/session';
 import { TranscriptItem } from '../types/transcript';
@@ -203,6 +204,19 @@ export class VoiceAgent {
       });
     }
 
+    // 2. Instant synchronous clinical rule extraction (<1ms)
+    const instantFindings = extractCardiacFindings(trimmedText, session.structuredData);
+    if (Object.keys(instantFindings).length > 0) {
+      this.sessionManager.updateStructuredData(callId, instantFindings as any);
+      const activeExt = this.activeExtractors.get(callId);
+      if (activeExt) {
+        const extState = activeExt.getCurrentState();
+        for (const [k, v] of Object.entries(instantFindings)) {
+          extState[k] = v as any;
+        }
+      }
+    }
+
     // 3 & 4. Concurrent execution: Conversation Agent response + Structured Data Extraction pass
     const extractor = this.activeExtractors.get(callId);
     if (extractor) {
@@ -250,7 +264,11 @@ export class VoiceAgent {
       console.error('[VoiceAgent] TTS synthesis error:', e.message);
     }
 
-    const liveStructuredData = extractor ? extractor.getCurrentState() : session.structuredData;
+    const liveStructuredData = {
+      ...(session.structuredData || {}),
+      ...(extractor ? extractor.getCurrentState() : {}),
+      ...instantFindings,
+    };
 
     return {
       responseText,

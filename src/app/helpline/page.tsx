@@ -25,6 +25,7 @@ import {
 import Link from 'next/link';
 
 import { filterAcousticEcho } from '@/core/utils/echo-filter';
+import { extractCardiacFindings } from '@/core/extraction/deterministic-extractor';
 
 export default function HelplinePage() {
   const [activeTab, setActiveTab] = useState<'voice' | 'phone'>('voice');
@@ -110,7 +111,7 @@ export default function HelplinePage() {
         if (!isPlayingRef.current && isConnectedRef.current) {
           safeStartRecognition();
         }
-      }, 600);
+      }, 800);
       return;
     }
 
@@ -165,12 +166,22 @@ export default function HelplinePage() {
 
       const data = await res.json();
       if (data.success) {
+        const greeting =
+          data.responseText ||
+          "Hello, this is the BeatAhead Cardiac Care Helpline. I'm here with you. Are you or someone near you experiencing chest discomfort, breathlessness, or unusual heart symptoms?";
+
+        recentAssistantTextsRef.current.push(greeting);
+        recentAssistantTextsRef.current.push(
+          "Hello, this is the BeatAhead Cardiac Care Helpline. I'm here with you. Are you or someone near you experiencing chest discomfort, breathlessness, or unusual heart symptoms?"
+        );
+        recentAssistantTextsRef.current.push(
+          "Hello, this is the Beta Head Cardiac Care Helpline. I'm here with you. Are you or someone near you experiencing chest discomfort, breathlessness, or unusual heart symptoms?"
+        );
+
         setTranscripts([
           {
             speaker: 'assistant',
-            text:
-              data.responseText ||
-              "Hello, this is the BeatAhead Cardiac Care Helpline. I'm here with you. Are you or someone near you experiencing chest discomfort, breathlessness, or unusual heart symptoms?",
+            text: greeting,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           },
         ]);
@@ -220,7 +231,7 @@ export default function HelplinePage() {
           if (!isPlayingRef.current) setIsListening(true);
         };
         recognition.onresult = (e: any) => {
-          if (isPlayingRef.current || Date.now() - lastAudioEndTimeRef.current < 600) {
+          if (isPlayingRef.current || Date.now() - lastAudioEndTimeRef.current < 800) {
             return;
           }
           const last = e.results[e.results.length - 1];
@@ -232,9 +243,9 @@ export default function HelplinePage() {
           }
         };
         recognition.onend = () => {
-          if (isConnectedRef.current && !isPlayingRef.current) {
+          if (isConnectedRef.current && !isPlayingRef.current && Date.now() - lastAudioEndTimeRef.current >= 800) {
             setTimeout(() => {
-              if (isConnectedRef.current && !isPlayingRef.current) {
+              if (isConnectedRef.current && !isPlayingRef.current && Date.now() - lastAudioEndTimeRef.current >= 800) {
                 try {
                   recognition.start();
                 } catch {}
@@ -243,9 +254,11 @@ export default function HelplinePage() {
           }
         };
 
-        try {
-          recognition.start();
-        } catch {}
+        if (!isPlayingRef.current && Date.now() - lastAudioEndTimeRef.current >= 800) {
+          try {
+            recognition.start();
+          } catch {}
+        }
         recognitionRef.current = recognition;
         return;
       } catch (err) {}
@@ -318,6 +331,12 @@ export default function HelplinePage() {
     if (!textToSend || textToSend.length < 2) return;
 
     stopCurrentAudio();
+
+    // 0ms instant client-side deterministic symptom extraction
+    const instant = extractCardiacFindings(textToSend, extractedData);
+    if (Object.keys(instant).length > 0) {
+      setExtractedData((prev) => ({ ...prev, ...instant }));
+    }
 
     setTranscripts((prev) => [
       ...prev,
