@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertCircle,
@@ -289,9 +289,7 @@ const STEPS = [
   { label: "Family", icon: Users, description: "Hereditary risk & care contacts" },
 ] as const;
 
-// ─────────────────────── main page ─────────────────────
-
-export default function HealthRecordPage() {
+function HealthRecordPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isOnboarding = searchParams.get("onboarding") === "true";
@@ -1143,5 +1141,20 @@ export default function HealthRecordPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function HealthRecordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center p-6 text-center bg-[#070b14]">
+          <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+          <p className="text-sm text-white/60">Loading Health Record...</p>
+        </div>
+      }
+    >
+      <HealthRecordPageContent />
+    </Suspense>
   );
 }

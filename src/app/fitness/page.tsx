@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { FitRestProvider, useFitRest } from "@/lib/fit-rest/FitRestContext";
 import { WorkoutPlanCard } from "@/components/fit-rest/WorkoutPlanCard";
@@ -280,7 +280,7 @@ function FitnessPageInner() {
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <Calendar className="h-5 w-5 text-navy-600" />
-          <h2 className="text-lg font-semibold text-navy-900">Today's Workout</h2>
+          <h2 className="text-lg font-semibold text-navy-900">Today&apos;s Workout</h2>
         </div>
 
         {todaysWorkout ? (

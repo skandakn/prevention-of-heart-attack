@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useBeatAheadAuth, SafeUserButton } from "@/lib/auth/ClerkAuthWrapper";
 
 import {
@@ -27,11 +27,24 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSubscription } from "@/lib/subscription/SubscriptionContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DemoModePanel } from "./DemoModePanel";
 import { SystemStatusPanel } from "./SystemStatusPanel";
 import { SettingsButton } from "./SettingsPanel";
 import { Button } from "@/components/ui/button";
+
+function useIsOnboarding(pathname: string): boolean {
+  const [isOnboarding, setIsOnboarding] = useState(false);
+  useEffect(() => {
+    if (typeof window !== "undefined" && pathname.startsWith("/health-record")) {
+      const params = new URLSearchParams(window.location.search);
+      setIsOnboarding(params.get("onboarding") === "true");
+    } else {
+      setIsOnboarding(false);
+    }
+  }, [pathname]);
+  return isOnboarding;
+}
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -53,10 +66,9 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const isOnboarding = useIsOnboarding(pathname);
   const isLanding = pathname === "/";
   const isAuthPage = pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up");
-  const isOnboarding = pathname.startsWith("/health-record") && searchParams.get("onboarding") === "true";
 
   if (isLanding || isAuthPage || isOnboarding) return null;
 
@@ -127,11 +139,10 @@ function SidebarSignOutButton() {
 
 export function MobileNav() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const isOnboarding = useIsOnboarding(pathname);
   const [open, setOpen] = useState(false);
   const isLanding = pathname === "/";
   const isAuthPage = pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up");
-  const isOnboarding = pathname.startsWith("/health-record") && searchParams.get("onboarding") === "true";
 
   if (isLanding || isAuthPage || isOnboarding) return null;
 
@@ -219,11 +230,10 @@ export function MobileNav() {
 
 export function AppHeader() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const isOnboarding = useIsOnboarding(pathname);
   const { isSignedIn } = useBeatAheadAuth();
   const isLanding = pathname === "/";
   const isAuthPage = pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up");
-  const isOnboarding = pathname.startsWith("/health-record") && searchParams.get("onboarding") === "true";
 
   if (isLanding || isAuthPage || isOnboarding) return null;
 

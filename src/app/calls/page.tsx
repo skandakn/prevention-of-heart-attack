@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   PhoneCall,
   Activity,
@@ -64,7 +64,7 @@ export default function CallsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<string>('all');
 
-  const fetchCalls = async () => {
+  const fetchCalls = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/calls');
@@ -72,8 +72,8 @@ export default function CallsPage() {
       if (data.calls) {
         setCalls(data.calls);
         setStats(data.stats);
-        if (data.calls.length > 0 && !selectedCall) {
-          setSelectedCall(data.calls[0]);
+        if (data.calls.length > 0) {
+          setSelectedCall((prev) => prev || data.calls[0]);
         }
       }
     } catch (e) {
@@ -81,11 +81,11 @@ export default function CallsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchCalls();
-  }, []);
+  }, [fetchCalls]);
 
   const formatDuration = (secs?: number) => {
     if (!secs) return '0s';
