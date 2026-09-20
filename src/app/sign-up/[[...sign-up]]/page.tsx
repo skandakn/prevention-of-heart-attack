@@ -21,6 +21,7 @@ export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const googleAccounts = [
     { name: "Skand Sharma", email: "skand.sharma@gmail.com", avatar: "S" },
@@ -31,7 +32,7 @@ export default function SignUpPage() {
     setIsLoading(true);
     signInDemoUser({ name: acc.name, email: acc.email });
     setTimeout(() => {
-      router.push("/dashboard");
+      router.push("/health-record?onboarding=true");
     }, 400);
   };
 
@@ -44,19 +45,32 @@ export default function SignUpPage() {
       email: customGoogleEmail,
     });
     setTimeout(() => {
-      router.push("/dashboard");
+      router.push("/health-record?onboarding=true");
     }, 400);
   };
 
   const handleEmailSignUp = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+    if (!name.trim()) {
+      setFormError("Please enter your full name.");
+      return;
+    }
+    if (!email.trim()) {
+      setFormError("Please enter your email address.");
+      return;
+    }
+    if (!password.trim() || password.length < 6) {
+      setFormError("Password must be at least 6 characters.");
+      return;
+    }
     setIsLoading(true);
     signInDemoUser({
-      name: name || (email ? email.split("@")[0] : "Research User"),
-      email: email || "user@beatahead.ai",
+      name: name.trim(),
+      email: email.trim(),
     });
     setTimeout(() => {
-      router.push("/dashboard");
+      router.push("/health-record?onboarding=true");
     }, 400);
   };
 
@@ -97,7 +111,7 @@ export default function SignUpPage() {
             path="/sign-up"
             routing="path"
             signInUrl="/sign-in"
-            fallbackRedirectUrl="/dashboard"
+            fallbackRedirectUrl="/health-record?onboarding=true"
             appearance={{
               elements: {
                 rootBox: "w-full",
@@ -153,46 +167,58 @@ export default function SignUpPage() {
             {/* Email Form */}
             <form onSubmit={handleEmailSignUp} className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-navy-300 mb-1">Full name</label>
+                <label className="block text-xs font-medium text-navy-300 mb-1">Full name <span className="text-red-400">*</span></label>
                 <div className="relative">
                   <User className="w-4 h-4 text-navy-500 absolute left-3 top-3" />
                   <input
                     type="text"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Research Evaluator"
+                    onChange={(e) => { setName(e.target.value); setFormError(null); }}
+                    placeholder="e.g. John Smith"
+                    required
                     className="w-full bg-navy-950 border border-navy-800 focus:border-cardiac rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-navy-500 outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-navy-300 mb-1">Email address</label>
+                <label className="block text-xs font-medium text-navy-300 mb-1">Email address <span className="text-red-400">*</span></label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-navy-500 absolute left-3 top-3" />
                   <input
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="user@beatahead.ai"
+                    onChange={(e) => { setEmail(e.target.value); setFormError(null); }}
+                    placeholder="you@example.com"
+                    required
                     className="w-full bg-navy-950 border border-navy-800 focus:border-cardiac rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-navy-500 outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-navy-300 mb-1">Password</label>
+                <label className="block text-xs font-medium text-navy-300 mb-1">Password <span className="text-red-400">*</span></label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-navy-500 absolute left-3 top-3" />
                   <input
                     type="password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
+                    onChange={(e) => { setPassword(e.target.value); setFormError(null); }}
+                    placeholder="Min. 6 characters"
+                    required
+                    minLength={6}
                     className="w-full bg-navy-950 border border-navy-800 focus:border-cardiac rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-navy-500 outline-none"
                   />
                 </div>
               </div>
+
+              {/* Validation error */}
+              {formError && (
+                <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                  <span className="flex-shrink-0">⚠</span>
+                  {formError}
+                </div>
+              )}
 
               <Button
                 type="submit"
