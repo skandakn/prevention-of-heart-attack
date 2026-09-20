@@ -2,6 +2,7 @@
 
 import { FitRestProvider, useFitRest } from "@/lib/fit-rest/FitRestContext";
 import { WorkoutPlanCard } from "@/components/fit-rest/WorkoutPlanCard";
+import { FitnessAIChat } from "@/components/fitness/FitnessAIChat";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DisclaimerBanner } from "@/components/layout/Footer";
@@ -497,6 +498,18 @@ function FitnessPageInner() {
           </div>
         </div>
       )}
+
+      {/* ── AI Fitness Coach Section ───────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Dumbbell className="h-5 w-5 text-blue-600" />
+          <h2 className="text-lg font-semibold text-navy-900">AI Fitness Coach</h2>
+        </div>
+
+        <div className="max-w-4xl">
+          <FitnessAIChat />
+        </div>
+      </div>
 
       {/* ── Wellness disclaimer ────────────────────────────────────────── */}
       <div className="rounded-xl border border-navy-100 bg-navy-50/50 px-4 py-3">
