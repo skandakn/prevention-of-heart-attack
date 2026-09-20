@@ -6,6 +6,7 @@ import { SleepOverview } from "@/components/fit-rest/SleepOverview";
 import { RecoveryStatus } from "@/components/fit-rest/RecoveryStatus";
 import { WindDownRoutine } from "@/components/fit-rest/WindDownRoutine";
 import { SleepHistory } from "@/components/fit-rest/SleepHistory";
+import { RestAIChat } from "@/components/rest/RestAIChat";
 import { DisclaimerBanner } from "@/components/layout/Footer";
 import { SimulatedBadge } from "@/components/layout/Toast";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -70,6 +71,18 @@ function RestPageInner() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* ── AI Sleep Coach Section ───────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Moon className="h-5 w-5 text-indigo-600" />
+          <h2 className="text-lg font-semibold text-navy-900">AI Sleep Coach</h2>
+        </div>
+
+        <div className="max-w-4xl">
+          <RestAIChat />
+        </div>
+      </div>
 
       {/* ── Wellness disclaimer ────────────────────────────────────────── */}
       <div className="rounded-xl border border-navy-100 bg-navy-50/50 px-4 py-3">
