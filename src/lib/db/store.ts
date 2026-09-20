@@ -96,3 +96,28 @@ export function updateSubscription(userId: string = "demo-user-1", updates: Part
 
   return updated;
 }
+export interface PatientRecord {
+  userId: string;
+  updatedAt: string;
+  [key: string]: unknown;
+}
+const PATIENT_RECORD_FILE = path.join(DATA_DIR, "patient-records.json");
+export function getPatientRecord(userId = "demo-user-1"): PatientRecord {
+  ensureDirectoryExists();
+  try {
+    const records: Record<string, PatientRecord> = fs.existsSync(PATIENT_RECORD_FILE)
+      ? JSON.parse(fs.readFileSync(PATIENT_RECORD_FILE, "utf-8")) : {};
+    return records[userId] || { userId, updatedAt: new Date().toISOString() };
+  } catch {
+    return { userId, updatedAt: new Date().toISOString() };
+  }
+}
+export function updatePatientRecord(userId: string, updates: Record<string, unknown>): PatientRecord {
+  ensureDirectoryExists();
+  let records: Record<string, PatientRecord> = {};
+  try { if (fs.existsSync(PATIENT_RECORD_FILE)) records = JSON.parse(fs.readFileSync(PATIENT_RECORD_FILE, "utf-8")); } catch {}
+  const record: PatientRecord = { ...records[userId], ...updates, userId, updatedAt: new Date().toISOString() };
+  records[userId] = record;
+  fs.writeFileSync(PATIENT_RECORD_FILE, JSON.stringify(records, null, 2), "utf-8");
+  return record;
+}
