@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -8,6 +8,7 @@ import {
   Activity,
   BarChart3,
   Brain,
+  Dumbbell,
   Heart,
   LayoutDashboard,
   Menu,
@@ -39,6 +40,7 @@ const navItems = [
   { href: "/trends", label: "Trends", icon: BarChart3 },
   { href: "/insights", label: "AI Insights", icon: Brain },
   { href: "/nutri-agent", label: "Nutri Agent", icon: Salad },
+  { href: "/fitness", label: "Fitness", icon: Dumbbell },
   { href: "/clinician", label: "Clinician View", icon: Stethoscope },
   { href: "/pricing", label: "Pricing", icon: CreditCard },
   { href: "/methodology", label: "Methodology", icon: BookOpen },
@@ -223,6 +225,7 @@ export function AppHeader() {
     "/trends": "Long-term Trends",
     "/insights": "AI Insights",
     "/nutri-agent": "Nutri Agent",
+    "/fitness": "Fitness",
     "/clinician": "Clinician Dashboard",
     "/pricing": "Pricing & Plans",
     "/methodology": "Methodology",
@@ -300,4 +303,3 @@ function HeaderProStatusBadge() {
     </span>
   );
 }
-
