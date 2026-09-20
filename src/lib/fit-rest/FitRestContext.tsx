@@ -87,7 +87,19 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
       // Load workout history (or generate demo data)
       const storedWorkouts = localStorage.getItem(STORAGE_KEYS.WORKOUT_HISTORY);
       if (storedWorkouts) {
-        setWorkoutHistory(JSON.parse(storedWorkouts) as WorkoutSession[]);
+        const parsed = JSON.parse(storedWorkouts) as WorkoutSession[];
+        // Only use stored data if it's a non-empty array
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setWorkoutHistory(parsed);
+        } else {
+          // Empty array or invalid data - initialize with demo data
+          const demoWorkouts = generateDemoWorkoutHistory();
+          setWorkoutHistory(demoWorkouts);
+          localStorage.setItem(
+            STORAGE_KEYS.WORKOUT_HISTORY,
+            JSON.stringify(demoWorkouts)
+          );
+        }
       } else {
         // Initialize with demo data
         const demoWorkouts = generateDemoWorkoutHistory();
@@ -101,7 +113,16 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
       // Load sleep history (or generate demo data)
       const storedSleep = localStorage.getItem(STORAGE_KEYS.SLEEP_HISTORY);
       if (storedSleep) {
-        setSleepHistory(JSON.parse(storedSleep) as SleepSession[]);
+        const parsed = JSON.parse(storedSleep) as SleepSession[];
+        // Only use stored data if it's a non-empty array
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSleepHistory(parsed);
+        } else {
+          // Empty array or invalid data - initialize with demo data
+          const demoSleep = generateDemoSleepHistory();
+          setSleepHistory(demoSleep);
+          localStorage.setItem(STORAGE_KEYS.SLEEP_HISTORY, JSON.stringify(demoSleep));
+        }
       } else {
         // Initialize with demo data
         const demoSleep = generateDemoSleepHistory();

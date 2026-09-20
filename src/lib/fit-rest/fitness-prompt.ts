@@ -5,7 +5,7 @@
  *     It is only used inside src/app/api/fitness-agent/chat/route.ts
  */
 
-import type { FitnessProfile, FitnessIntent, FitRestISIContext } from "./types";
+import type { FitnessProfile, FitnessIntent, FitRestISIContext, RecoveryState } from "./types";
 
 // ─── Embedded safety rules ────────────────────────────────────────────────────
 
@@ -70,6 +70,22 @@ function buildFitnessProfileSummary(profile: FitnessProfile | null | undefined):
   - Available equipment: ${equipmentList}`;
 }
 
+// ─── Recovery context summary builder (optional) ──────────────────────────────
+
+function buildRecoveryContextSummary(
+  recovery: RecoveryState | null | undefined
+): string {
+  if (!recovery) {
+    return "Recent activity and rest context: Not available.";
+  }
+
+  return `Recent activity and rest summary (last 7 days):
+  - ${recovery.recentWorkoutSummary}
+  - ${recovery.recentSleepSummary}
+  
+  Note: This is informational context to help coordinate fitness recommendations with recent activity and rest patterns. Use this to suggest appropriate workout intensity or recovery-focused activities, but do not diagnose overtraining or sleep disorders.`;
+}
+
 // ─── ISI context summary builder (optional read-only context) ─────────────────
 
 function buildISIContextSummary(
@@ -93,13 +109,16 @@ function buildISIContextSummary(
 export function buildFitnessSystemPrompt(
   fitnessProfile: FitnessProfile | null | undefined,
   intent: FitnessIntent = "chat",
-  isiContext?: FitRestISIContext | null
+  isiContext?: FitRestISIContext | null,
+  recoveryContext?: RecoveryState | null
 ): string {
   return `${FITNESS_SAFETY_RULES}
 
 You are BeatAhead Fitness Agent — a friendly, evidence-informed wellness fitness assistant embedded in the BeatAhead research prototype application.
 
 ${buildISIContextSummary(isiContext)}
+
+${buildRecoveryContextSummary(recoveryContext)}
 
 ${buildFitnessProfileSummary(fitnessProfile)}
 

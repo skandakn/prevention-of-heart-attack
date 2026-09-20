@@ -5,12 +5,14 @@ import type {
   FitnessIntent,
   FitnessProfile,
   FitRestISIContext,
+  RecoveryState,
 } from "@/lib/fit-rest/types";
 
 interface ChatRequestBody {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   isiContext: unknown;
   fitnessProfile: unknown;
+  recoveryContext: unknown;
   intent: unknown;
 }
 
@@ -131,6 +133,55 @@ function validateISIContext(
   return c as unknown as FitRestISIContext;
 }
 
+function validateRecoveryContext(
+  recovery: unknown
+): RecoveryState | null | undefined {
+  if (recovery === null || recovery === undefined) {
+    return recovery;
+  }
+
+  if (typeof recovery !== "object" || recovery === null) {
+    throw new Error("recoveryContext must be an object or null");
+  }
+
+  const r = recovery as Record<string, unknown>;
+
+  // Validate required fields
+  if (typeof r.workoutCount !== "number") {
+    throw new Error("recoveryContext.workoutCount must be number");
+  }
+
+  if (typeof r.intenseWorkoutCount !== "number") {
+    throw new Error("recoveryContext.intenseWorkoutCount must be number");
+  }
+
+  if (typeof r.totalWorkoutMinutes !== "number") {
+    throw new Error("recoveryContext.totalWorkoutMinutes must be number");
+  }
+
+  if (typeof r.avgSleepHours !== "number") {
+    throw new Error("recoveryContext.avgSleepHours must be number");
+  }
+
+  if (typeof r.sleepConsistencyPercent !== "number") {
+    throw new Error("recoveryContext.sleepConsistencyPercent must be number");
+  }
+
+  if (typeof r.sleepDebtHours !== "number") {
+    throw new Error("recoveryContext.sleepDebtHours must be number");
+  }
+
+  if (typeof r.recentWorkoutSummary !== "string") {
+    throw new Error("recoveryContext.recentWorkoutSummary must be string");
+  }
+
+  if (typeof r.recentSleepSummary !== "string") {
+    throw new Error("recoveryContext.recentSleepSummary must be string");
+  }
+
+  return r as unknown as RecoveryState;
+}
+
 // ── API route handler ─────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
@@ -140,6 +191,7 @@ export async function POST(request: Request) {
       messages = [],
       isiContext = null,
       fitnessProfile = null,
+      recoveryContext = null,
       intent = "chat",
     } = body;
 
@@ -162,10 +214,12 @@ export async function POST(request: Request) {
     // Validate and sanitize profile (throws on validation error)
     let validatedProfile: FitnessProfile | null | undefined;
     let validatedISIContext: FitRestISIContext | null | undefined;
+    let validatedRecoveryContext: RecoveryState | null | undefined;
 
     try {
       validatedProfile = validateFitnessProfile(fitnessProfile);
       validatedISIContext = validateISIContext(isiContext);
+      validatedRecoveryContext = validateRecoveryContext(recoveryContext);
     } catch (validationError: unknown) {
       const message =
         validationError instanceof Error
@@ -199,7 +253,8 @@ export async function POST(request: Request) {
     const systemInstruction = buildFitnessSystemPrompt(
       validatedProfile,
       intent,
-      validatedISIContext
+      validatedISIContext,
+      validatedRecoveryContext
     );
 
     // ── Instantiate provider — reads GEMINI_API_KEY from process.env

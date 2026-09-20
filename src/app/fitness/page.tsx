@@ -3,11 +3,12 @@
 import { FitRestProvider, useFitRest } from "@/lib/fit-rest/FitRestContext";
 import { WorkoutPlanCard } from "@/components/fit-rest/WorkoutPlanCard";
 import { FitnessAIChat } from "@/components/fitness/FitnessAIChat";
+import { FitnessProfileForm } from "@/components/fitness/FitnessProfileForm";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DisclaimerBanner } from "@/components/layout/Footer";
 import { SimulatedBadge } from "@/components/layout/Toast";
-import { Dumbbell, CheckCircle2, Calendar, TrendingUp, Clock, Target, Activity, History, Award } from "lucide-react";
+import { Dumbbell, CheckCircle2, Calendar, TrendingUp, Clock, Target, Activity, History, Award, AlertCircle } from "lucide-react";
 import { EXERCISE_TYPE_LABELS } from "@/lib/fit-rest/types";
 import { cn } from "@/lib/utils";
 
@@ -59,6 +60,26 @@ function FitnessPageInner() {
 
       {/* ── Disclaimer ────────────────────────────────────────────────── */}
       <DisclaimerBanner />
+
+      {/* ── Demo Mode Warning ─────────────────────────────────────────── */}
+      {isDemoMode && (
+        <Card className="border-amber-200 bg-amber-50/50">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-semibold text-amber-700 mb-1">
+                  Demo Mode — Simulated Activity Data
+                </p>
+                <p className="text-xs text-amber-600 leading-relaxed">
+                  This workout data is simulated for demonstration purposes.
+                  Complete your profile to track real workout data.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Fitness Overview Section ──────────────────────────────────── */}
       <div className="space-y-3">
@@ -498,6 +519,19 @@ function FitnessPageInner() {
           </div>
         </div>
       )}
+
+      {/* ── My Fitness Profile Section ─────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Dumbbell className="h-5 w-5 text-navy-600" />
+          <h2 className="text-lg font-semibold text-navy-900">
+            My Fitness Profile
+          </h2>
+        </div>
+        <div className="max-w-2xl">
+          <FitnessProfileForm />
+        </div>
+      </div>
 
       {/* ── AI Fitness Coach Section ───────────────────────────────────── */}
       <div className="space-y-4">

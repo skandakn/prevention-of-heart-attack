@@ -197,7 +197,7 @@ export interface RecoveryState {
 
   // Computed from sleep history (last 7 days)
   avgSleepHours: number;
-  sleepConsistencyPercent: number; // % of nights with 7-9 hours
+  sleepConsistencyPercent: number; // % of nights within ±1hr of target
   sleepDebtHours: number; // (target × 7) - actual
 
   // Context summaries for AI (plain text)
