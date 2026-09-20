@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useBeatAheadAuth, SafeUserButton } from "@/lib/auth/ClerkAuthWrapper";
 
 import {
@@ -49,10 +49,12 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const isLanding = pathname === "/";
   const isAuthPage = pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up");
+  const isOnboarding = pathname.startsWith("/health-record") && searchParams.get("onboarding") === "true";
 
-  if (isLanding || isAuthPage) return null;
+  if (isLanding || isAuthPage || isOnboarding) return null;
 
   return (
     <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 lg:z-40 border-r border-navy-100 bg-white">
@@ -119,14 +121,15 @@ function SidebarSignOutButton() {
   );
 }
 
-
 export function MobileNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
   const isLanding = pathname === "/";
   const isAuthPage = pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up");
+  const isOnboarding = pathname.startsWith("/health-record") && searchParams.get("onboarding") === "true";
 
-  if (isLanding || isAuthPage) return null;
+  if (isLanding || isAuthPage || isOnboarding) return null;
 
   const mobileItems = navItems.slice(0, 5);
 
@@ -212,11 +215,13 @@ export function MobileNav() {
 
 export function AppHeader() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { isSignedIn } = useBeatAheadAuth();
   const isLanding = pathname === "/";
   const isAuthPage = pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up");
+  const isOnboarding = pathname.startsWith("/health-record") && searchParams.get("onboarding") === "true";
 
-  if (isLanding || isAuthPage) return null;
+  if (isLanding || isAuthPage || isOnboarding) return null;
 
   const titles: Record<string, string> = {
     "/dashboard": "Live Physiological Monitoring",
@@ -276,8 +281,6 @@ export function AppHeader() {
   );
 }
 
-
-
 function HeaderProStatusBadge() {
   const { subscriptionStatus, demoMode } = useSubscription();
 
@@ -303,4 +306,3 @@ function HeaderProStatusBadge() {
     </span>
   );
 }
-

@@ -481,6 +481,7 @@ export default function HealthRecordPage() {
           </div>
         )}
 
+
         {/* ── Non-onboarding header ── */}
         {!isOnboarding && (
           <div className="flex items-start justify-between mb-8">
