@@ -20,6 +20,7 @@ import {
   CreditCard,
   PhoneCall,
   FileText,
+  HeartPulse,
   LogIn,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/helpline", label: "Cardiac Helpline", icon: PhoneCall },
   { href: "/calls", label: "Call Records", icon: FileText },
+  { href: "/health-record", label: "Health Record", icon: HeartPulse },
   { href: "/monitor", label: "Live Monitor", icon: Radio },
   { href: "/signals", label: "Signals", icon: Activity },
   { href: "/trends", label: "Trends", icon: BarChart3 },
@@ -223,6 +225,7 @@ export function AppHeader() {
     "/trends": "Long-term Trends",
     "/insights": "AI Insights",
     "/nutri-agent": "Nutri Agent",
+    "/health-record": "My Health Record",
     "/clinician": "Clinician Dashboard",
     "/pricing": "Pricing & Plans",
     "/methodology": "Methodology",
