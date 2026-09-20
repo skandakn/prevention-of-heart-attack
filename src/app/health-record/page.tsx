@@ -432,7 +432,11 @@ function HealthRecordPageContent() {
 
   // ── render ──
   return (
-    <div className="min-h-screen bg-[#030712] text-white">
+    <div className={
+      isOnboarding
+        ? "fixed inset-0 z-[9999] bg-[#030712] text-white overflow-y-auto"
+        : "min-h-screen bg-[#030712] text-white"
+    }>
       {/* Background gradient blobs */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-64 -left-64 w-[600px] h-[600px] rounded-full bg-red-600/8 blur-3xl animate-pulse" style={{ animationDuration: "6s" }} />
