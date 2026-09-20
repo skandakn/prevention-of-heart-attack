@@ -246,8 +246,9 @@ export function computeRecoveryState(
       ? recentSleep.reduce((sum, s) => sum + s.hoursSlept, 0) / sleepCount
       : 0;
 
+  // Use target-relative consistency (within 1 hour of user's personal target)
   const consistentNights = recentSleep.filter(
-    (s) => s.hoursSlept >= 7 && s.hoursSlept <= 9
+    (s) => Math.abs(s.hoursSlept - targetSleepHours) <= 1
   ).length;
   const sleepConsistencyPercent = sleepCount > 0 ? (consistentNights / 7) * 100 : 0;
 
