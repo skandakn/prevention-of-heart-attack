@@ -116,34 +116,6 @@ export function CardiacVoiceWidget() {
     setIsAudioPaused(false);
   }, []);
 
-  // Toggle audio pause / resume (works for both ElevenLabs audio and speechSynthesis)
-  const toggleAudioPause = useCallback(() => {
-    const audio = currentAudioRef.current;
-    if (audio) {
-      // ElevenLabs base64 audio path
-      if (audio.paused) {
-        isAudioPausedRef.current = false;
-        setIsAudioPaused(false);
-        audio.play().catch(() => {});
-      } else {
-        isAudioPausedRef.current = true;
-        setIsAudioPaused(true);
-        audio.pause();
-      }
-    } else if (typeof window !== 'undefined' && window.speechSynthesis) {
-      // Browser speechSynthesis fallback path
-      if (window.speechSynthesis.paused) {
-        isAudioPausedRef.current = false;
-        setIsAudioPaused(false);
-        window.speechSynthesis.resume();
-      } else if (window.speechSynthesis.speaking) {
-        isAudioPausedRef.current = true;
-        setIsAudioPaused(true);
-        window.speechSynthesis.pause();
-      }
-    }
-  }, []);
-
 
   // Safely pause speech recognition
   const safeAbortRecognition = useCallback(() => {
@@ -165,6 +137,48 @@ export function CardiacVoiceWidget() {
       // Ignore if already active
     }
   }, []);
+
+  // Toggle audio pause / resume:
+  //   PAUSE  → audio pauses, isPlayingRef goes false, mic starts (user can speak)
+  //   RESUME → mic stops, isPlayingRef goes true, audio resumes
+  const toggleAudioPause = useCallback(() => {
+    const audio = currentAudioRef.current;
+    if (audio) {
+      // ElevenLabs base64 audio path
+      if (isAudioPausedRef.current) {
+        // RESUME — stop mic, mark playing, resume audio
+        safeAbortRecognition();
+        isPlayingRef.current = true;
+        isAudioPausedRef.current = false;
+        setIsAudioPaused(false);
+        audio.play().catch(() => {});
+      } else {
+        // PAUSE — pause audio, free mic for user input
+        isAudioPausedRef.current = true;
+        isPlayingRef.current = false;
+        setIsAudioPaused(true);
+        audio.pause();
+        setTimeout(() => safeStartRecognition(), 150);
+      }
+    } else if (typeof window !== 'undefined' && window.speechSynthesis) {
+      // Browser speechSynthesis fallback path
+      if (isAudioPausedRef.current) {
+        // RESUME
+        safeAbortRecognition();
+        isPlayingRef.current = true;
+        isAudioPausedRef.current = false;
+        setIsAudioPaused(false);
+        window.speechSynthesis.resume();
+      } else if (window.speechSynthesis.speaking) {
+        // PAUSE
+        isAudioPausedRef.current = true;
+        isPlayingRef.current = false;
+        setIsAudioPaused(true);
+        window.speechSynthesis.pause();
+        setTimeout(() => safeStartRecognition(), 150);
+      }
+    }
+  }, [safeAbortRecognition, safeStartRecognition]);
 
   // Speak text via browser speechSynthesis (fallback when no ElevenLabs audio)
   const speakFallback = useCallback((text: string) => {
@@ -280,7 +294,8 @@ export function CardiacVoiceWidget() {
 
   const queueAudio = useCallback((base64Audio: string) => {
     audioQueueRef.current.push(base64Audio);
-    if (!isPlayingRef.current) {
+    // Don't trigger playback if already playing or if user has paused
+    if (!isPlayingRef.current && !isAudioPausedRef.current) {
       playNextAudio();
     }
   }, [playNextAudio]);
