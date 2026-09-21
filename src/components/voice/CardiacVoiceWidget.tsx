@@ -18,8 +18,11 @@ import {
   Clock,
   Radio,
   ExternalLink,
+  Pause,
+  Play,
 } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { filterAcousticEcho } from '@/core/utils/echo-filter';
 import { extractCardiacFindings } from '@/core/extraction/deterministic-extractor';
 
@@ -30,9 +33,11 @@ interface SymptomState {
 }
 
 export function CardiacVoiceWidget() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isAudioPaused, setIsAudioPaused] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [callId, setCallId] = useState<string>('');
@@ -100,6 +105,20 @@ export function CardiacVoiceWidget() {
     }
     isPlayingRef.current = false;
     setIsSpeaking(false);
+    setIsAudioPaused(false);
+  }, []);
+
+  // Toggle audio pause / resume
+  const toggleAudioPause = useCallback(() => {
+    const audio = currentAudioRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      audio.play().catch(() => {});
+      setIsAudioPaused(false);
+    } else {
+      audio.pause();
+      setIsAudioPaused(true);
+    }
   }, []);
 
   // Safely pause speech recognition
@@ -128,6 +147,7 @@ export function CardiacVoiceWidget() {
     if (audioQueueRef.current.length === 0) {
       isPlayingRef.current = false;
       setIsSpeaking(false);
+      setIsAudioPaused(false);
       lastAudioEndTimeRef.current = Date.now();
 
       // Buffer 800ms after speaker audio stops before restarting speech recognition
@@ -498,6 +518,11 @@ export function CardiacVoiceWidget() {
     (field) => field && field.value !== null && field.value !== undefined && field.value !== ''
   );
 
+  // Hide on sign-in and sign-up pages — helpline is only available after login
+  if (pathname?.startsWith('/sign-in') || pathname?.startsWith('/sign-up')) {
+    return null;
+  }
+
   return (
     <>
       {/* Floating Trigger Button */}
@@ -551,6 +576,18 @@ export function CardiacVoiceWidget() {
               </div>
 
               <div className="flex items-center gap-1.5">
+                {/* Pause / Resume audio button — only visible while assistant is speaking */}
+                {isSpeaking && (
+                  <button
+                    onClick={toggleAudioPause}
+                    title={isAudioPaused ? 'Resume audio' : 'Pause audio'}
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-amber-400 transition-colors"
+                  >
+                    {isAudioPaused
+                      ? <Play className="h-4 w-4" />
+                      : <Pause className="h-4 w-4" />}
+                  </button>
+                )}
                 <Link
                   href="/helpline"
                   title="Open Full Screen Helpline"
