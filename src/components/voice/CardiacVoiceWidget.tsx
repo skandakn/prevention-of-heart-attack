@@ -144,49 +144,6 @@ export function CardiacVoiceWidget() {
     }
   }, []);
 
-  // Speak text via browser speechSynthesis (fallback when no ElevenLabs audio)
-  const speakFallback = useCallback((text: string) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.95;
-    utterance.pitch = 1;
-    utterance.volume = 1;
-    // Prefer a natural-sounding voice if available
-    const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find(
-      (v) => v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Female'))
-    ) || voices.find((v) => v.lang.startsWith('en'));
-    if (preferred) utterance.voice = preferred;
-
-    isPlayingRef.current = true;
-    isAudioPausedRef.current = false;
-    setIsSpeaking(true);
-    setIsAudioPaused(false);
-    safeAbortRecognition();
-    speechUtteranceRef.current = utterance;
-
-    utterance.onend = () => {
-      speechUtteranceRef.current = null;
-      isPlayingRef.current = false;
-      isAudioPausedRef.current = false;
-      setIsSpeaking(false);
-      setIsAudioPaused(false);
-      lastAudioEndTimeRef.current = Date.now();
-      setTimeout(() => {
-        if (!isPlayingRef.current && isConnectedRef.current) {
-          safeStartRecognition();
-        }
-      }, 800);
-    };
-    utterance.onerror = () => {
-      speechUtteranceRef.current = null;
-      isPlayingRef.current = false;
-      setIsSpeaking(false);
-      setIsAudioPaused(false);
-    };
-    window.speechSynthesis.speak(utterance);
-  }, [safeAbortRecognition, safeStartRecognition]);
 
   // Safely pause speech recognition
   const safeAbortRecognition = useCallback(() => {
@@ -208,6 +165,65 @@ export function CardiacVoiceWidget() {
       // Ignore if already active
     }
   }, []);
+
+  // Speak text via browser speechSynthesis (fallback when no ElevenLabs audio)
+  const speakFallback = useCallback((text: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    // Voices load asynchronously — wait for them if empty
+    const assignVoiceAndSpeak = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = voices.find(
+        (v) => v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Female'))
+      ) || voices.find((v) => v.lang.startsWith('en'));
+      if (preferred) utterance.voice = preferred;
+
+      isPlayingRef.current = true;
+      isAudioPausedRef.current = false;
+      setIsSpeaking(true);
+      setIsAudioPaused(false);
+      safeAbortRecognition();
+      speechUtteranceRef.current = utterance;
+
+      utterance.onend = () => {
+        speechUtteranceRef.current = null;
+        isPlayingRef.current = false;
+        isAudioPausedRef.current = false;
+        setIsSpeaking(false);
+        setIsAudioPaused(false);
+        lastAudioEndTimeRef.current = Date.now();
+        setTimeout(() => {
+          if (!isPlayingRef.current && isConnectedRef.current) {
+            safeStartRecognition();
+          }
+        }, 800);
+      };
+      utterance.onerror = () => {
+        speechUtteranceRef.current = null;
+        isPlayingRef.current = false;
+        setIsSpeaking(false);
+        setIsAudioPaused(false);
+      };
+      window.speechSynthesis.speak(utterance);
+    };
+
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      assignVoiceAndSpeak();
+    } else {
+      // Voices not yet loaded — wait for the voiceschanged event
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.onvoiceschanged = null;
+        assignVoiceAndSpeak();
+      };
+      // Safety net: speak even if event never fires
+      setTimeout(assignVoiceAndSpeak, 500);
+    }
+  }, [safeAbortRecognition, safeStartRecognition]);
 
   // Audio queue sequential playback with acoustic echo protection
   const playNextAudio = useCallback(() => {
