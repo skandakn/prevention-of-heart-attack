@@ -55,6 +55,7 @@ export function CardiacVoiceWidget() {
   const isPlayingRef = useRef(false);
   const isAudioPausedRef = useRef(false);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const lastAudioEndTimeRef = useRef<number>(0);
   const recentAssistantTextsRef = useRef<string[]>([
     'Hello, this is the BeatAhead Cardiac Care Helpline. I am here with you. Are you or someone near you experiencing chest discomfort, breathlessness, or unusual heart symptoms?',
@@ -92,7 +93,7 @@ export function CardiacVoiceWidget() {
     return `${m}:${s}`;
   };
 
-  // Stop currently playing audio immediately
+  // Stop currently playing audio immediately (ElevenLabs + speechSynthesis)
   const stopCurrentAudio = useCallback(() => {
     audioQueueRef.current = [];
     if (currentAudioRef.current) {
@@ -104,25 +105,88 @@ export function CardiacVoiceWidget() {
       } catch {}
       currentAudioRef.current = null;
     }
+    // Also cancel any browser speechSynthesis in progress
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      try { window.speechSynthesis.cancel(); } catch {}
+    }
+    speechUtteranceRef.current = null;
     isPlayingRef.current = false;
+    isAudioPausedRef.current = false;
     setIsSpeaking(false);
     setIsAudioPaused(false);
   }, []);
 
-  // Toggle audio pause / resume
+  // Toggle audio pause / resume (works for both ElevenLabs audio and speechSynthesis)
   const toggleAudioPause = useCallback(() => {
     const audio = currentAudioRef.current;
-    if (!audio) return;
-    if (audio.paused) {
-      isAudioPausedRef.current = false;
-      setIsAudioPaused(false);
-      audio.play().catch(() => {});
-    } else {
-      isAudioPausedRef.current = true;
-      setIsAudioPaused(true);
-      audio.pause();
+    if (audio) {
+      // ElevenLabs base64 audio path
+      if (audio.paused) {
+        isAudioPausedRef.current = false;
+        setIsAudioPaused(false);
+        audio.play().catch(() => {});
+      } else {
+        isAudioPausedRef.current = true;
+        setIsAudioPaused(true);
+        audio.pause();
+      }
+    } else if (typeof window !== 'undefined' && window.speechSynthesis) {
+      // Browser speechSynthesis fallback path
+      if (window.speechSynthesis.paused) {
+        isAudioPausedRef.current = false;
+        setIsAudioPaused(false);
+        window.speechSynthesis.resume();
+      } else if (window.speechSynthesis.speaking) {
+        isAudioPausedRef.current = true;
+        setIsAudioPaused(true);
+        window.speechSynthesis.pause();
+      }
     }
   }, []);
+
+  // Speak text via browser speechSynthesis (fallback when no ElevenLabs audio)
+  const speakFallback = useCallback((text: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    // Prefer a natural-sounding voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find(
+      (v) => v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Female'))
+    ) || voices.find((v) => v.lang.startsWith('en'));
+    if (preferred) utterance.voice = preferred;
+
+    isPlayingRef.current = true;
+    isAudioPausedRef.current = false;
+    setIsSpeaking(true);
+    setIsAudioPaused(false);
+    safeAbortRecognition();
+    speechUtteranceRef.current = utterance;
+
+    utterance.onend = () => {
+      speechUtteranceRef.current = null;
+      isPlayingRef.current = false;
+      isAudioPausedRef.current = false;
+      setIsSpeaking(false);
+      setIsAudioPaused(false);
+      lastAudioEndTimeRef.current = Date.now();
+      setTimeout(() => {
+        if (!isPlayingRef.current && isConnectedRef.current) {
+          safeStartRecognition();
+        }
+      }, 800);
+    };
+    utterance.onerror = () => {
+      speechUtteranceRef.current = null;
+      isPlayingRef.current = false;
+      setIsSpeaking(false);
+      setIsAudioPaused(false);
+    };
+    window.speechSynthesis.speak(utterance);
+  }, [safeAbortRecognition, safeStartRecognition]);
 
   // Safely pause speech recognition
   const safeAbortRecognition = useCallback(() => {
@@ -282,6 +346,9 @@ export function CardiacVoiceWidget() {
 
           if (data.audioBase64) {
             queueAudio(data.audioBase64);
+          } else if (data.responseText) {
+            // No ElevenLabs audio — fall back to browser speechSynthesis
+            speakFallback(data.responseText);
           }
 
           if (data.structuredData) {
@@ -304,7 +371,7 @@ export function CardiacVoiceWidget() {
         setStatusMessage('Error processing turn: ' + err.message);
       }
     },
-    [callId, extractedData, queueAudio, stopCurrentAudio]
+    [callId, extractedData, queueAudio, speakFallback, stopCurrentAudio]
   );
 
   // Microphone capture setup
@@ -476,6 +543,9 @@ export function CardiacVoiceWidget() {
 
         if (data.audioBase64) {
           queueAudio(data.audioBase64);
+        } else if (greeting) {
+          // No ElevenLabs audio — fall back to browser speechSynthesis
+          speakFallback(greeting);
         }
 
         startMicrophoneCapture(newCallId);
@@ -484,7 +554,7 @@ export function CardiacVoiceWidget() {
       console.error('Failed to start call:', err);
       setStatusMessage('Connection failed: ' + err.message);
     }
-  }, [queueAudio, startMicrophoneCapture, stopCurrentAudio]);
+  }, [queueAudio, speakFallback, startMicrophoneCapture, stopCurrentAudio]);
 
   // End call session
   const endCall = useCallback(async () => {
