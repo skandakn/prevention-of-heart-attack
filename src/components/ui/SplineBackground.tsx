@@ -28,7 +28,7 @@ export function SplineBackground({ className = "" }: SplineBackgroundProps) {
       {/* Spline 3D Canvas Iframe */}
       <div className="absolute inset-0 w-full h-full">
         <iframe
-          src="https://my.spline.design/claritystream-7qzK4XBJMPL81QslDlbxBUVs/"
+          src="https://my.spline.design/claritystream-yUjfRXGVgcCuHGB1XE4Uvnx2/"
           title="Spline 3D Scene - Clarity Stream"
           onLoad={() => setIsLoaded(true)}
           allow="autoplay; fullscreen; xr-spatial-tracking"
