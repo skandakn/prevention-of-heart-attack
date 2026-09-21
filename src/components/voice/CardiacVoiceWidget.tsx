@@ -53,6 +53,7 @@ export function CardiacVoiceWidget() {
   // Audio & Echo Cancellation References
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
+  const isAudioPausedRef = useRef(false);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const lastAudioEndTimeRef = useRef<number>(0);
   const recentAssistantTextsRef = useRef<string[]>([
@@ -113,11 +114,13 @@ export function CardiacVoiceWidget() {
     const audio = currentAudioRef.current;
     if (!audio) return;
     if (audio.paused) {
-      audio.play().catch(() => {});
+      isAudioPausedRef.current = false;
       setIsAudioPaused(false);
+      audio.play().catch(() => {});
     } else {
-      audio.pause();
+      isAudioPausedRef.current = true;
       setIsAudioPaused(true);
+      audio.pause();
     }
   }, []);
 
@@ -148,6 +151,7 @@ export function CardiacVoiceWidget() {
       isPlayingRef.current = false;
       setIsSpeaking(false);
       setIsAudioPaused(false);
+      isAudioPausedRef.current = false;
       lastAudioEndTimeRef.current = Date.now();
 
       // Buffer 800ms after speaker audio stops before restarting speech recognition
@@ -160,6 +164,8 @@ export function CardiacVoiceWidget() {
     }
 
     isPlayingRef.current = true;
+    isAudioPausedRef.current = false;
+    setIsAudioPaused(false);
     setIsSpeaking(true);
     safeAbortRecognition(); // Abort microphone capture while speaker is playing!
 
@@ -167,7 +173,9 @@ export function CardiacVoiceWidget() {
     const audio = new Audio(`data:audio/mpeg;base64,${base64Audio}`);
     currentAudioRef.current = audio;
 
+    // Guard: only chain to next track if not user-paused
     audio.onended = () => {
+      if (isAudioPausedRef.current) return; // user paused — don't advance queue
       currentAudioRef.current = null;
       lastAudioEndTimeRef.current = Date.now();
       playNextAudio();
@@ -177,6 +185,7 @@ export function CardiacVoiceWidget() {
       console.warn('Audio playback error:', e);
       currentAudioRef.current = null;
       lastAudioEndTimeRef.current = Date.now();
+      isAudioPausedRef.current = false;
       playNextAudio();
     };
 
@@ -184,6 +193,7 @@ export function CardiacVoiceWidget() {
       console.warn('Autoplay prevented:', err);
       currentAudioRef.current = null;
       lastAudioEndTimeRef.current = Date.now();
+      isAudioPausedRef.current = false;
       playNextAudio();
     });
   }, [safeAbortRecognition, safeStartRecognition]);
