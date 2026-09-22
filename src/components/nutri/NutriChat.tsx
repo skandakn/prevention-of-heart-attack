@@ -115,7 +115,7 @@ export function NutriChat({ isiContext }: NutriChatProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-emerald-600" />
-            <CardTitle className="text-sm">AI Nutrition Insights</CardTitle>
+            <CardTitle className="text-sm">24/7 Beat Ahead Assistant</CardTitle>
           </div>
           {messages.length > 0 && (
             <button

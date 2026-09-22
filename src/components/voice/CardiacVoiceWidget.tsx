@@ -641,7 +641,7 @@ export function CardiacVoiceWidget() {
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3">
           <button
             onClick={() => setIsOpen(true)}
-            aria-label="Open AI Cardiac Helpline"
+            aria-label="Open 24/7 Beat Ahead Assistant"
             className="group relative flex items-center gap-3 rounded-full bg-gradient-to-r from-red-600 via-rose-600 to-red-700 px-5 py-3.5 text-white shadow-2xl shadow-red-600/40 transition-all duration-300 hover:scale-105 hover:shadow-red-600/60 focus:outline-none focus:ring-4 focus:ring-red-500/30"
           >
             <span className="absolute -inset-1 rounded-full bg-red-500/30 opacity-75 blur-sm animate-pulse group-hover:opacity-100" />
@@ -649,10 +649,7 @@ export function CardiacVoiceWidget() {
               <HeartPulse className="h-5 w-5 text-white animate-pulse" />
             </div>
             <div className="relative text-left">
-              <p className="text-xs font-bold uppercase tracking-wider text-red-100">
-                24/7 AI Triage
-              </p>
-              <p className="text-sm font-extrabold tracking-tight">Cardiac Helpline</p>
+              <p className="text-sm font-extrabold tracking-tight">24/7 Beat Ahead Assistant</p>
             </div>
             <div className="relative ml-1 flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -674,7 +671,7 @@ export function CardiacVoiceWidget() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-bold text-white">BeatAhead Helpline</h2>
+                    <h2 className="text-sm font-bold text-white">24/7 Beat Ahead Assistant</h2>
                     {isConnected && (
                       <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
