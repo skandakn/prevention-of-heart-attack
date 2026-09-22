@@ -41,8 +41,8 @@ const navItems = [
   { href: "/trends", label: "Trends", icon: BarChart3 },
   { href: "/insights", label: "AI Insights", icon: Brain },
   { href: "/nutri-agent", label: "Nutri Agent", icon: Salad },
-  { href: "/fitness", label: "Fitness", icon: Dumbbell },
-  { href: "/rest", label: "Rest", icon: Moon },
+  { href: "/fitness", label: "Fitness Agent", icon: Dumbbell },
+  { href: "/rest", label: "Rest Agent", icon: Moon },
   { href: "/clinician", label: "Clinician View", icon: Stethoscope },
   { href: "/pricing", label: "Pricing", icon: CreditCard },
   { href: "/methodology", label: "Methodology", icon: BookOpen },
@@ -55,6 +55,13 @@ export function Sidebar() {
   const isAuthPage = pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up");
 
   if (isLanding || isAuthPage) return null;
+
+  // Hide these items on dashboard page (they're in the footer)
+  const hiddenOnDashboard = ["/helpline", "/calls", "/pricing", "/methodology", "/about"];
+  const isDashboard = pathname === "/dashboard";
+  const visibleNavItems = isDashboard
+    ? navItems.filter((item) => !hiddenOnDashboard.includes(item.href))
+    : navItems;
 
   return (
     <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 lg:z-40 border-r border-navy-100 bg-white">
@@ -69,7 +76,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
           return (
@@ -227,8 +234,8 @@ export function AppHeader() {
     "/trends": "Long-term Trends",
     "/insights": "AI Insights",
     "/nutri-agent": "Nutri Agent",
-    "/fitness": "Fitness",
-    "/rest": "Rest & Sleep",
+    "/fitness": "Fitness Agent",
+    "/rest": "Rest Agent",
     "/clinician": "Clinician Dashboard",
     "/pricing": "Pricing & Plans",
     "/methodology": "Methodology",
