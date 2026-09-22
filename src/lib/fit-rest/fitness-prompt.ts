@@ -5,7 +5,7 @@
  *     It is only used inside src/app/api/fitness-agent/chat/route.ts
  */
 
-import type { FitnessProfile, FitnessIntent, FitRestISIContext, RecoveryState } from "./types";
+import type { FitnessProfile, FitnessIntent, FitRestISIContext, RecoveryState, WorkoutSession } from "./types";
 
 // ─── Embedded safety rules ────────────────────────────────────────────────────
 
@@ -44,6 +44,39 @@ const INTENT_INSTRUCTIONS: Record<FitnessIntent, string> = {
 
   explain: `Explain in 3–4 sentences why the fitness suggestions provided are appropriate for this user. Reference their profile (fitness level, goals, available equipment, time constraints) and general fitness principles. Do NOT reference the wellness indicator as a clinical measurement. Use accessible, non-clinical language.`,
 };
+
+// ─── Google Fit data summary builder ─────────────────────────────────────────
+
+function buildGoogleFitSummary(
+  workouts: WorkoutSession[] | null | undefined
+): string {
+  if (!workouts || workouts.length === 0) return "";
+
+  const gfitWorkouts = workouts.filter((w) => w.id.startsWith("gfit_"));
+  if (gfitWorkouts.length === 0) return "";
+
+  // Summarise the last 7 days of real Google Fit data
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const recent = gfitWorkouts.filter(
+    (w) => new Date(w.date).getTime() >= sevenDaysAgo
+  );
+
+  const typeCounts: Record<string, number> = {};
+  let totalMins = 0;
+  for (const w of recent) {
+    typeCounts[w.type] = (typeCounts[w.type] ?? 0) + 1;
+    totalMins += w.durationMinutes;
+  }
+
+  const typeList = Object.entries(typeCounts)
+    .map(([t, n]) => `${t.replace(/_/g, " ")} (×${n})`)
+    .join(", ");
+
+  return `Real workout data from Google Fit (last 7 days, ${recent.length} sessions, ${totalMins} total minutes):
+  - Activities: ${typeList || "various"}
+  - Source: Google Fit — this is REAL data logged by the user, not simulated.
+  Use this data to give highly personalised and accurate fitness recommendations.`;
+}
 
 // ─── Profile summary builder ──────────────────────────────────────────────────
 
@@ -110,8 +143,11 @@ export function buildFitnessSystemPrompt(
   fitnessProfile: FitnessProfile | null | undefined,
   intent: FitnessIntent = "chat",
   isiContext?: FitRestISIContext | null,
-  recoveryContext?: RecoveryState | null
+  recoveryContext?: RecoveryState | null,
+  workouts?: WorkoutSession[] | null
 ): string {
+  const googleFitSection = buildGoogleFitSummary(workouts);
+
   return `${FITNESS_SAFETY_RULES}
 
 You are BeatAhead Fitness Agent — a friendly, evidence-informed wellness fitness assistant embedded in the BeatAhead research prototype application.
@@ -121,7 +157,7 @@ ${buildISIContextSummary(isiContext)}
 ${buildRecoveryContextSummary(recoveryContext)}
 
 ${buildFitnessProfileSummary(fitnessProfile)}
-
+${googleFitSection ? `\n${googleFitSection}\n` : ""}
 CURRENT TASK: ${INTENT_INSTRUCTIONS[intent]}
 
 FORMATTING RULES:

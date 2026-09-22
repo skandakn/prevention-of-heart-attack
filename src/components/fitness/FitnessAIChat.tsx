@@ -91,7 +91,7 @@ function MessageBubble({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function FitnessAIChat() {
-  const { fitnessProfile, recoveryState, isDemoMode } = useFitRest();
+  const { fitnessProfile, recoveryState, isDemoMode, workoutHistory } = useFitRest();
 
   const [messages, setMessages] = useState<FitnessMessage[]>([]);
   const [input, setInput] = useState("");
@@ -142,6 +142,7 @@ export function FitnessAIChat() {
           isiContext,
           recoveryContext: recoveryState,
           intent,
+          workouts: workoutHistory,
         }),
       });
 

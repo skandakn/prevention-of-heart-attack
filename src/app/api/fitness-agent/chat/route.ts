@@ -6,6 +6,7 @@ import type {
   FitnessProfile,
   FitRestISIContext,
   RecoveryState,
+  WorkoutSession,
 } from "@/lib/fit-rest/types";
 
 interface ChatRequestBody {
@@ -14,6 +15,7 @@ interface ChatRequestBody {
   fitnessProfile: unknown;
   recoveryContext: unknown;
   intent: unknown;
+  workouts?: unknown;
 }
 
 // ── Runtime validation helpers ────────────────────────────────────────────────
@@ -193,6 +195,7 @@ export async function POST(request: Request) {
       fitnessProfile = null,
       recoveryContext = null,
       intent = "chat",
+      workouts = null,
     } = body;
 
     // Validate messages
@@ -254,7 +257,8 @@ export async function POST(request: Request) {
       validatedProfile,
       intent,
       validatedISIContext,
-      validatedRecoveryContext
+      validatedRecoveryContext,
+      Array.isArray(workouts) ? (workouts as WorkoutSession[]) : null
     );
 
     // ── Instantiate provider — reads GEMINI_API_KEY from process.env
