@@ -649,7 +649,10 @@ export function CardiacVoiceWidget() {
               <HeartPulse className="h-5 w-5 text-white animate-pulse" />
             </div>
             <div className="relative text-left">
-              <p className="text-sm font-extrabold tracking-tight">24/7 Beat Ahead Assistant</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-red-100">
+                24/7 Beat Ahead
+              </p>
+              <p className="text-sm font-extrabold tracking-tight">Assistant</p>
             </div>
             <div className="relative ml-1 flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
