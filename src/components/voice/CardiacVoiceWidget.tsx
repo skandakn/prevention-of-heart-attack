@@ -18,8 +18,11 @@ import {
   Clock,
   Radio,
   ExternalLink,
+  Pause,
+  Play,
 } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { filterAcousticEcho } from '@/core/utils/echo-filter';
 import { extractCardiacFindings } from '@/core/extraction/deterministic-extractor';
 
@@ -30,9 +33,11 @@ interface SymptomState {
 }
 
 export function CardiacVoiceWidget() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isAudioPaused, setIsAudioPaused] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [callId, setCallId] = useState<string>('');
@@ -48,7 +53,9 @@ export function CardiacVoiceWidget() {
   // Audio & Echo Cancellation References
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
+  const isAudioPausedRef = useRef(false);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const lastAudioEndTimeRef = useRef<number>(0);
   const recentAssistantTextsRef = useRef<string[]>([
     'Hello, this is the BeatAhead Cardiac Care Helpline. I am here with you. Are you or someone near you experiencing chest discomfort, breathlessness, or unusual heart symptoms?',
@@ -86,7 +93,7 @@ export function CardiacVoiceWidget() {
     return `${m}:${s}`;
   };
 
-  // Stop currently playing audio immediately
+  // Stop currently playing audio immediately (ElevenLabs + speechSynthesis)
   const stopCurrentAudio = useCallback(() => {
     audioQueueRef.current = [];
     if (currentAudioRef.current) {
@@ -98,9 +105,17 @@ export function CardiacVoiceWidget() {
       } catch {}
       currentAudioRef.current = null;
     }
+    // Also cancel any browser speechSynthesis in progress
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      try { window.speechSynthesis.cancel(); } catch {}
+    }
+    speechUtteranceRef.current = null;
     isPlayingRef.current = false;
+    isAudioPausedRef.current = false;
     setIsSpeaking(false);
+    setIsAudioPaused(false);
   }, []);
+
 
   // Safely pause speech recognition
   const safeAbortRecognition = useCallback(() => {
@@ -123,11 +138,114 @@ export function CardiacVoiceWidget() {
     }
   }, []);
 
+  // Toggle audio pause / resume:
+  //   PAUSE  → audio pauses, isPlayingRef goes false, mic starts (user can speak)
+  //   RESUME → mic stops, isPlayingRef goes true, audio resumes
+  const toggleAudioPause = useCallback(() => {
+    const audio = currentAudioRef.current;
+    if (audio) {
+      // ElevenLabs base64 audio path
+      if (isAudioPausedRef.current) {
+        // RESUME — stop mic, mark playing, resume audio
+        safeAbortRecognition();
+        isPlayingRef.current = true;
+        isAudioPausedRef.current = false;
+        setIsAudioPaused(false);
+        audio.play().catch(() => {});
+      } else {
+        // PAUSE — pause audio, free mic for user input
+        isAudioPausedRef.current = true;
+        isPlayingRef.current = false;
+        setIsAudioPaused(true);
+        audio.pause();
+        setTimeout(() => safeStartRecognition(), 150);
+      }
+    } else if (typeof window !== 'undefined' && window.speechSynthesis) {
+      // Browser speechSynthesis fallback path
+      if (isAudioPausedRef.current) {
+        // RESUME
+        safeAbortRecognition();
+        isPlayingRef.current = true;
+        isAudioPausedRef.current = false;
+        setIsAudioPaused(false);
+        window.speechSynthesis.resume();
+      } else if (window.speechSynthesis.speaking) {
+        // PAUSE
+        isAudioPausedRef.current = true;
+        isPlayingRef.current = false;
+        setIsAudioPaused(true);
+        window.speechSynthesis.pause();
+        setTimeout(() => safeStartRecognition(), 150);
+      }
+    }
+  }, [safeAbortRecognition, safeStartRecognition]);
+
+  // Speak text via browser speechSynthesis (fallback when no ElevenLabs audio)
+  const speakFallback = useCallback((text: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    // Voices load asynchronously — wait for them if empty
+    const assignVoiceAndSpeak = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = voices.find(
+        (v) => v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Female'))
+      ) || voices.find((v) => v.lang.startsWith('en'));
+      if (preferred) utterance.voice = preferred;
+
+      isPlayingRef.current = true;
+      isAudioPausedRef.current = false;
+      setIsSpeaking(true);
+      setIsAudioPaused(false);
+      safeAbortRecognition();
+      speechUtteranceRef.current = utterance;
+
+      utterance.onend = () => {
+        speechUtteranceRef.current = null;
+        isPlayingRef.current = false;
+        isAudioPausedRef.current = false;
+        setIsSpeaking(false);
+        setIsAudioPaused(false);
+        lastAudioEndTimeRef.current = Date.now();
+        setTimeout(() => {
+          if (!isPlayingRef.current && isConnectedRef.current) {
+            safeStartRecognition();
+          }
+        }, 800);
+      };
+      utterance.onerror = () => {
+        speechUtteranceRef.current = null;
+        isPlayingRef.current = false;
+        setIsSpeaking(false);
+        setIsAudioPaused(false);
+      };
+      window.speechSynthesis.speak(utterance);
+    };
+
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      assignVoiceAndSpeak();
+    } else {
+      // Voices not yet loaded — wait for the voiceschanged event
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.onvoiceschanged = null;
+        assignVoiceAndSpeak();
+      };
+      // Safety net: speak even if event never fires
+      setTimeout(assignVoiceAndSpeak, 500);
+    }
+  }, [safeAbortRecognition, safeStartRecognition]);
+
   // Audio queue sequential playback with acoustic echo protection
   const playNextAudio = useCallback(() => {
     if (audioQueueRef.current.length === 0) {
       isPlayingRef.current = false;
       setIsSpeaking(false);
+      setIsAudioPaused(false);
+      isAudioPausedRef.current = false;
       lastAudioEndTimeRef.current = Date.now();
 
       // Buffer 800ms after speaker audio stops before restarting speech recognition
@@ -140,6 +258,8 @@ export function CardiacVoiceWidget() {
     }
 
     isPlayingRef.current = true;
+    isAudioPausedRef.current = false;
+    setIsAudioPaused(false);
     setIsSpeaking(true);
     safeAbortRecognition(); // Abort microphone capture while speaker is playing!
 
@@ -147,7 +267,9 @@ export function CardiacVoiceWidget() {
     const audio = new Audio(`data:audio/mpeg;base64,${base64Audio}`);
     currentAudioRef.current = audio;
 
+    // Guard: only chain to next track if not user-paused
     audio.onended = () => {
+      if (isAudioPausedRef.current) return; // user paused — don't advance queue
       currentAudioRef.current = null;
       lastAudioEndTimeRef.current = Date.now();
       playNextAudio();
@@ -157,6 +279,7 @@ export function CardiacVoiceWidget() {
       console.warn('Audio playback error:', e);
       currentAudioRef.current = null;
       lastAudioEndTimeRef.current = Date.now();
+      isAudioPausedRef.current = false;
       playNextAudio();
     };
 
@@ -164,13 +287,15 @@ export function CardiacVoiceWidget() {
       console.warn('Autoplay prevented:', err);
       currentAudioRef.current = null;
       lastAudioEndTimeRef.current = Date.now();
+      isAudioPausedRef.current = false;
       playNextAudio();
     });
   }, [safeAbortRecognition, safeStartRecognition]);
 
   const queueAudio = useCallback((base64Audio: string) => {
     audioQueueRef.current.push(base64Audio);
-    if (!isPlayingRef.current) {
+    // Don't trigger playback if already playing or if user has paused
+    if (!isPlayingRef.current && !isAudioPausedRef.current) {
       playNextAudio();
     }
   }, [playNextAudio]);
@@ -252,6 +377,9 @@ export function CardiacVoiceWidget() {
 
           if (data.audioBase64) {
             queueAudio(data.audioBase64);
+          } else if (data.responseText) {
+            // No ElevenLabs audio — fall back to browser speechSynthesis
+            speakFallback(data.responseText);
           }
 
           if (data.structuredData) {
@@ -274,7 +402,7 @@ export function CardiacVoiceWidget() {
         setStatusMessage('Error processing turn: ' + err.message);
       }
     },
-    [callId, extractedData, queueAudio, stopCurrentAudio]
+    [callId, extractedData, queueAudio, speakFallback, stopCurrentAudio]
   );
 
   // Microphone capture setup
@@ -446,6 +574,9 @@ export function CardiacVoiceWidget() {
 
         if (data.audioBase64) {
           queueAudio(data.audioBase64);
+        } else if (greeting) {
+          // No ElevenLabs audio — fall back to browser speechSynthesis
+          speakFallback(greeting);
         }
 
         startMicrophoneCapture(newCallId);
@@ -454,7 +585,7 @@ export function CardiacVoiceWidget() {
       console.error('Failed to start call:', err);
       setStatusMessage('Connection failed: ' + err.message);
     }
-  }, [queueAudio, startMicrophoneCapture, stopCurrentAudio]);
+  }, [queueAudio, speakFallback, startMicrophoneCapture, stopCurrentAudio]);
 
   // End call session
   const endCall = useCallback(async () => {
@@ -498,6 +629,11 @@ export function CardiacVoiceWidget() {
     (field) => field && field.value !== null && field.value !== undefined && field.value !== ''
   );
 
+  // Hide on sign-in and sign-up pages — helpline is only available after login
+  if (pathname?.startsWith('/sign-in') || pathname?.startsWith('/sign-up')) {
+    return null;
+  }
+
   return (
     <>
       {/* Floating Trigger Button */}
@@ -505,7 +641,7 @@ export function CardiacVoiceWidget() {
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3">
           <button
             onClick={() => setIsOpen(true)}
-            aria-label="Open AI Cardiac Helpline"
+            aria-label="Open 24/7 Beat Ahead Assistant"
             className="group relative flex items-center gap-3 rounded-full bg-gradient-to-r from-red-600 via-rose-600 to-red-700 px-5 py-3.5 text-white shadow-2xl shadow-red-600/40 transition-all duration-300 hover:scale-105 hover:shadow-red-600/60 focus:outline-none focus:ring-4 focus:ring-red-500/30"
           >
             <span className="absolute -inset-1 rounded-full bg-red-500/30 opacity-75 blur-sm animate-pulse group-hover:opacity-100" />
@@ -514,9 +650,9 @@ export function CardiacVoiceWidget() {
             </div>
             <div className="relative text-left">
               <p className="text-xs font-bold uppercase tracking-wider text-red-100">
-                24/7 AI Triage
+                24/7 Beat Ahead
               </p>
-              <p className="text-sm font-extrabold tracking-tight">Cardiac Helpline</p>
+              <p className="text-sm font-extrabold tracking-tight">Assistant</p>
             </div>
             <div className="relative ml-1 flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -538,7 +674,7 @@ export function CardiacVoiceWidget() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-bold text-white">BeatAhead Helpline</h2>
+                    <h2 className="text-sm font-bold text-white">24/7 Beat Ahead Assistant</h2>
                     {isConnected && (
                       <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
@@ -551,6 +687,18 @@ export function CardiacVoiceWidget() {
               </div>
 
               <div className="flex items-center gap-1.5">
+                {/* Pause / Resume audio button — only visible while assistant is speaking */}
+                {isSpeaking && (
+                  <button
+                    onClick={toggleAudioPause}
+                    title={isAudioPaused ? 'Resume audio' : 'Pause audio'}
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-amber-400 transition-colors"
+                  >
+                    {isAudioPaused
+                      ? <Play className="h-4 w-4" />
+                      : <Pause className="h-4 w-4" />}
+                  </button>
+                )}
                 <Link
                   href="/helpline"
                   title="Open Full Screen Helpline"

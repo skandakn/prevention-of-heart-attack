@@ -26,6 +26,17 @@ import {
   computeRecoveryState,
 } from "./demo-data";
 
+// ─── Google Fit token shape (stored in localStorage) ─────────────────────────
+
+export interface GoogleFitToken {
+  access_token: string;
+  refresh_token: string | null;
+  expires_at: number;
+}
+
+const GFIT_TOKEN_KEY = "beatahead-gfit-token";
+const GFIT_SYNCED_KEY = "beatahead-gfit-synced";
+
 // ─── Context Shape ────────────────────────────────────────────────────────────
 
 interface FitRestContextValue {
@@ -48,6 +59,14 @@ interface FitRestContextValue {
 
   // Demo mode indicator (read-only)
   isDemoMode: boolean;
+
+  // Google Fit integration
+  googleFitConnected: boolean;
+  googleFitLastSynced: number | null;  // epoch ms
+  googleFitSyncing: boolean;
+  googleFitError: string | null;
+  syncGoogleFit: () => Promise<void>;
+  disconnectGoogleFit: () => void;
 }
 
 const FitRestContext = createContext<FitRestContextValue | null>(null);
@@ -63,6 +82,12 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
   const [restProfile, setRestProfile] = useState<RestProfile>(DEFAULT_REST_PROFILE);
   const [workoutHistory, setWorkoutHistory] = useState<WorkoutSession[]>([]);
   const [sleepHistory, setSleepHistory] = useState<SleepSession[]>([]);
+
+  // ── Google Fit state ───────────────────────────────────────────────────────
+  const [googleFitToken, setGoogleFitToken] = useState<GoogleFitToken | null>(null);
+  const [googleFitLastSynced, setGoogleFitLastSynced] = useState<number | null>(null);
+  const [googleFitSyncing, setGoogleFitSyncing] = useState(false);
+  const [googleFitError, setGoogleFitError] = useState<string | null>(null);
 
   // ── Load from localStorage on mount ───────────────────────────────────────
 
@@ -128,6 +153,23 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
         const demoSleep = generateDemoSleepHistory();
         setSleepHistory(demoSleep);
         localStorage.setItem(STORAGE_KEYS.SLEEP_HISTORY, JSON.stringify(demoSleep));
+      }
+
+      // ── Load Google Fit token (if previously connected) ───────────────────
+      const storedToken = localStorage.getItem(GFIT_TOKEN_KEY);
+      if (storedToken) {
+        try {
+          setGoogleFitToken(JSON.parse(storedToken) as GoogleFitToken);
+        } catch {
+          localStorage.removeItem(GFIT_TOKEN_KEY);
+        }
+      }
+
+      // ── Load last synced timestamp ────────────────────────────────────────
+      const lastSynced = localStorage.getItem(GFIT_SYNCED_KEY);
+      if (lastSynced) {
+        const ts = Number(lastSynced);
+        if (!isNaN(ts)) setGoogleFitLastSynced(ts);
       }
     } catch (err) {
       console.error("[FitRestContext] Error loading from localStorage:", err);
@@ -248,6 +290,124 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
     return hasDemoWorkouts || hasDemoSleep;
   }, [workoutHistory, sleepHistory]);
 
+  // ── Google Fit: sync workouts from the API ─────────────────────────────────
+
+  const syncGoogleFit = useCallback(async () => {
+    if (!googleFitToken) {
+      setGoogleFitError("Not connected to Google Fit. Please connect first.");
+      return;
+    }
+    setGoogleFitSyncing(true);
+    setGoogleFitError(null);
+
+    try {
+      const res = await fetch("/api/google-fit/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(googleFitToken),
+      });
+
+      const data = await res.json() as {
+        success?: boolean;
+        workouts?: WorkoutSession[];
+        token?: GoogleFitToken;
+        error?: string;
+      };
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error ?? `Sync failed (${res.status})`);
+      }
+
+      const freshWorkouts: WorkoutSession[] = data.workouts ?? [];
+
+      // Merge: keep non-gfit entries, replace all gfit_ entries with fresh data
+      setWorkoutHistory((prev) => {
+        const nonGfit = prev.filter((w) => !w.id.startsWith("gfit_"));
+        const merged = [...freshWorkouts, ...nonGfit].sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+        try {
+          localStorage.setItem(STORAGE_KEYS.WORKOUT_HISTORY, JSON.stringify(merged));
+        } catch {/* ignore */}
+        return merged;
+      });
+
+      // Persist refreshed token if it changed
+      if (data.token) {
+        setGoogleFitToken(data.token);
+        try {
+          localStorage.setItem(GFIT_TOKEN_KEY, JSON.stringify(data.token));
+        } catch {/* ignore */}
+      }
+
+      const now = Date.now();
+      setGoogleFitLastSynced(now);
+      try {
+        localStorage.setItem(GFIT_SYNCED_KEY, String(now));
+      } catch {/* ignore */}
+    } catch (err) {
+      setGoogleFitError(
+        err instanceof Error ? err.message : "Google Fit sync failed. Please try again."
+      );
+    } finally {
+      setGoogleFitSyncing(false);
+    }
+  }, [googleFitToken]);
+
+  // ── Google Fit: disconnect ─────────────────────────────────────────────────
+
+  const disconnectGoogleFit = useCallback(() => {
+    setGoogleFitToken(null);
+    setGoogleFitLastSynced(null);
+    setGoogleFitError(null);
+    try {
+      localStorage.removeItem(GFIT_TOKEN_KEY);
+      localStorage.removeItem(GFIT_SYNCED_KEY);
+      // Remove imported workouts and replace with demo data
+      const demoWorkouts = generateDemoWorkoutHistory();
+      setWorkoutHistory(demoWorkouts);
+      localStorage.setItem(STORAGE_KEYS.WORKOUT_HISTORY, JSON.stringify(demoWorkouts));
+    } catch {/* ignore */}
+  }, []);
+
+  // ── Google Fit: listen for popup auth success ─────────────────────────────
+
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      if (!event.data || event.data.type !== "GFIT_AUTH_SUCCESS") return;
+
+      // The callback page already wrote token + workouts to localStorage.
+      // Re-read them into state so the UI updates without a full refresh.
+      try {
+        const storedToken = localStorage.getItem(GFIT_TOKEN_KEY);
+        if (storedToken) {
+          setGoogleFitToken(JSON.parse(storedToken) as GoogleFitToken);
+        }
+
+        const storedWorkouts = localStorage.getItem(STORAGE_KEYS.WORKOUT_HISTORY);
+        if (storedWorkouts) {
+          const parsed = JSON.parse(storedWorkouts) as WorkoutSession[];
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setWorkoutHistory(parsed);
+          }
+        }
+
+        const ts = Number(localStorage.getItem(GFIT_SYNCED_KEY));
+        if (!isNaN(ts) && ts > 0) setGoogleFitLastSynced(ts);
+
+        setGoogleFitError(null);
+      } catch {/* ignore */}
+    }
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  // ── Derived: is Google Fit currently connected ────────────────────────────
+
+  const googleFitConnected = googleFitToken !== null;
+
   // ── Context value ──────────────────────────────────────────────────────────
 
   const value: FitRestContextValue = {
@@ -266,6 +426,14 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
     recoveryState,
 
     isDemoMode,
+
+    // Google Fit
+    googleFitConnected,
+    googleFitLastSynced,
+    googleFitSyncing,
+    googleFitError,
+    syncGoogleFit,
+    disconnectGoogleFit,
   };
 
   return (

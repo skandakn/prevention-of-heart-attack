@@ -19,11 +19,19 @@ export function Toast() {
   );
 }
 
-export function SimulatedBadge({ className }: { className?: string }) {
+export function SimulatedBadge({ className, isLive = false }: { className?: string; isLive?: boolean }) {
+  if (isLive) {
+    return (
+      <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-200", className)}>
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        LIVE PHYSIOLOGICAL INPUT
+      </span>
+    );
+  }
   return (
     <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-medium border border-amber-200", className)}>
       <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-      SIMULATED SENSOR DATA
+      RESEARCH MODEL — SIMULATED INPUT
     </span>
   );
 }

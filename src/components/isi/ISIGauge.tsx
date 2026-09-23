@@ -2,7 +2,7 @@
 
 import { useSimulation } from "@/lib/simulation/SimulationContext";
 import { cn, getISILabel } from "@/lib/utils";
-import { Info } from "lucide-react";
+import { Info, ShieldAlert, CheckCircle2, Cpu } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MEDICAL_DISCLAIMER } from "@/lib/isi/types";
 
@@ -23,10 +23,16 @@ export function ISIGauge({
 }: ISIGaugeProps) {
   const { currentScore } = useSimulation();
   const score = propScore ?? currentScore?.score ?? 0;
-  const baseline = propBaseline ?? currentScore?.baseline ?? 48;
+  const baseline = propBaseline ?? currentScore?.baseline ?? 40;
   const trend = propTrend ?? currentScore?.trend ?? "stable";
   const confidence = propConfidence ?? currentScore?.confidence ?? 0;
   const deviation = score - baseline;
+
+  const modelEvidencePct = currentScore?.modelEvidence !== undefined 
+    ? (currentScore.modelEvidence * 100).toFixed(1) 
+    : "--";
+  const modelAlert = currentScore?.modelAlert ?? false;
+  const productState = currentScore?.state ?? "Normal / Stable";
 
   const circumference = 2 * Math.PI * 88;
   const strokeDashoffset = circumference - (score / 100) * circumference;
@@ -58,16 +64,45 @@ export function ISIGauge({
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={cn("font-bold text-navy-900", size === "lg" ? "text-5xl" : "text-3xl")}>
+          <span className={cn("font-bold text-navy-900 font-mono", size === "lg" ? "text-5xl" : "text-3xl")}>
             {score}
           </span>
-          <span className="text-sm font-medium text-navy-500">ISI</span>
+          <span className="text-xs font-semibold tracking-wider text-navy-500 uppercase mt-0.5">
+            ISI: {score} / 100
+          </span>
         </div>
       </div>
 
-      <p className="mt-3 text-sm font-medium text-navy-700">{getISILabel(score)}</p>
+      <p className="mt-2 text-sm font-semibold text-navy-800">{getISILabel(score)}</p>
+      
+      <span className="mt-1 text-[11px] font-medium text-navy-500 bg-navy-50 px-2 py-0.5 rounded-full border border-navy-100">
+        Status: {productState}
+      </span>
 
-      <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+      {/* Model Information Separator (Task 10 Requirement) */}
+      <div className="mt-3 w-full p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-1.5">
+        <div className="flex items-center justify-between font-medium">
+          <span className="text-slate-600 flex items-center gap-1">
+            <Cpu className="w-3.5 h-3.5 text-indigo-600" />
+            Model Evidence:
+          </span>
+          <span className="font-mono font-bold text-navy-900">{modelEvidencePct}%</span>
+        </div>
+        <div className="flex items-center justify-between font-medium">
+          <span className="text-slate-600">Model State:</span>
+          <span className={cn(
+            "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold",
+            modelAlert 
+              ? "bg-rose-100 text-rose-800 border border-rose-200" 
+              : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+          )}>
+            {modelAlert ? <ShieldAlert className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
+            {modelAlert ? "ALERT (≥ 0.156742)" : "NORMAL (< 0.156742)"}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-xs w-full">
         <div>
           <span className="text-navy-400">Personal baseline</span>
           <p className="font-semibold text-navy-900">{baseline}</p>
@@ -90,18 +125,18 @@ export function ISIGauge({
 
       <TooltipProvider>
         <Tooltip>
-          <TooltipTrigger className="mt-3 flex items-center gap-1 text-xs text-navy-400 hover:text-navy-600">
+          <TooltipTrigger className="mt-2.5 flex items-center gap-1 text-[11px] text-navy-400 hover:text-navy-600">
             <Info className="w-3 h-3" />
-            About ISI scoring
+            About ISI Scoring Architecture
           </TooltipTrigger>
           <TooltipContent className="max-w-xs">
-            <p>{MEDICAL_DISCLAIMER}</p>
+            <p className="text-xs">{MEDICAL_DISCLAIMER}</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
 
-      <p className="mt-2 text-[10px] text-navy-400 text-center max-w-xs">
-        Illustrative prototype ranges — not clinically validated thresholds.
+      <p className="mt-1 text-[10px] text-navy-400 text-center max-w-xs">
+        Prototype research composite index — not a clinically validated risk score.
       </p>
     </div>
   );
