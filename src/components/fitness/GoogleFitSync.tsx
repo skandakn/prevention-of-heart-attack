@@ -211,7 +211,7 @@ export function GoogleFitSync() {
             </Button>
 
             <p className="text-[10px] text-navy-400 leading-relaxed">
-              You'll be redirected to Google to authorise read-only access to your fitness
+              You&apos;ll be redirected to Google to authorise read-only access to your fitness
               activity data. No data is shared with third parties.
             </p>
           </>
