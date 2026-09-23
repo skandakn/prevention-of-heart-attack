@@ -12,7 +12,8 @@ import { NutriChat } from "@/components/nutri/NutriChat";
 import { NutriProfileForm } from "@/components/nutri/NutriProfileForm";
 import { DailyPlan } from "@/components/nutri/DailyPlan";
 import { SmartRecommendations } from "@/components/nutri/SmartRecommendations";
-import { Sparkles } from "lucide-react";
+import { NutriReport } from "@/components/nutri/NutriReport";
+import { Sparkles, FileText } from "lucide-react";
 import type { NutriISIContext } from "@/lib/nutri/types";
 
 // ─── Inner page (inside NutriProvider) ───────────────────────────────────────
@@ -56,6 +57,7 @@ function NutriAgentInner() {
           <TabsTrigger value="plan">Daily Plan</TabsTrigger>
           <TabsTrigger value="recs">Recommendations</TabsTrigger>
           <TabsTrigger value="profile">My Profile</TabsTrigger>
+          <TabsTrigger value="report">Print Report</TabsTrigger>
         </TabsList>
 
         {/* ── Tab 1: Chat + Wellness Snapshot ───────────────────────── */}
@@ -83,6 +85,13 @@ function NutriAgentInner() {
         <TabsContent value="profile">
           <div className="max-w-xl">
             <NutriProfileForm />
+          </div>
+        </TabsContent>
+
+        {/* ── Tab 5: Print report ───────────────────────────────────── */}
+        <TabsContent value="report">
+          <div className="max-w-2xl">
+            <NutriReport />
           </div>
         </TabsContent>
       </Tabs>

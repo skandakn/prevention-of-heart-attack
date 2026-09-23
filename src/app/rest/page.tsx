@@ -7,10 +7,11 @@ import { RecoveryStatus } from "@/components/fit-rest/RecoveryStatus";
 import { WindDownRoutine } from "@/components/fit-rest/WindDownRoutine";
 import { SleepHistory } from "@/components/fit-rest/SleepHistory";
 import { RestAIChat } from "@/components/rest/RestAIChat";
+import { RestReport } from "@/components/rest/RestReport";
 import { DisclaimerBanner } from "@/components/layout/Footer";
 import { SimulatedBadge } from "@/components/layout/Toast";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Moon } from "lucide-react";
+import { Moon, FileText } from "lucide-react";
 
 // ─── Inner page component (inside FitRestProvider) ────────────────────────────
 
@@ -71,6 +72,17 @@ function RestPageInner() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* ── Print Sleep Report Section ─────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <FileText className="h-5 w-5 text-indigo-600" />
+          <h2 className="text-lg font-semibold text-navy-900">Print Report</h2>
+        </div>
+        <div className="max-w-2xl">
+          <RestReport />
+        </div>
+      </div>
 
       {/* ── AI Sleep Coach Section ───────────────────────────────────── */}
       <div className="space-y-4">
