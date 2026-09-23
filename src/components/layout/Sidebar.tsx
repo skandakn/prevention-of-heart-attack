@@ -72,6 +72,13 @@ export function Sidebar() {
 
   if (isLanding || isAuthPage || isOnboarding) return null;
 
+  // Hide these items on dashboard page (they're in the footer)
+  const hiddenOnDashboard = ["/helpline", "/calls", "/pricing", "/methodology", "/about"];
+  const isDashboard = pathname === "/dashboard";
+  const visibleNavItems = isDashboard
+    ? navItems.filter((item) => !hiddenOnDashboard.includes(item.href))
+    : navItems;
+
   return (
     <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 lg:z-40 border-r border-navy-100 bg-white">
       <div className="flex items-center gap-3 px-6 py-5 border-b border-navy-100">
@@ -85,7 +92,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
           return (
@@ -245,8 +252,8 @@ export function AppHeader() {
     "/insights": "AI Insights",
     "/nutri-agent": "Nutri Agent",
     "/health-record": "My Health Record",
-    "/fitness": "Fitness",
-    "/rest": "Rest & Sleep",
+    "/fitness": "Fitness Agent",
+    "/rest": "Rest Agent",
     "/clinician": "Clinician Dashboard",
     "/pricing": "Pricing & Plans",
     "/methodology": "Methodology",
