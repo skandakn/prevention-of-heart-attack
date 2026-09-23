@@ -45,6 +45,10 @@ function RestPageInner() {
           <TabsTrigger value="routine">Wind-Down Routine</TabsTrigger>
           <TabsTrigger value="history">Sleep History</TabsTrigger>
           <TabsTrigger value="profile">My Profile</TabsTrigger>
+          <TabsTrigger value="report">
+            <FileText className="h-3.5 w-3.5 mr-1.5" />
+            Print Report
+          </TabsTrigger>
         </TabsList>
 
         {/* ── Tab 1: Sleep Overview + Recovery ──────────────────────── */}
@@ -71,18 +75,14 @@ function RestPageInner() {
             <RestProfileForm />
           </div>
         </TabsContent>
-      </Tabs>
 
-      {/* ── Print Sleep Report Section ─────────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <FileText className="h-5 w-5 text-indigo-600" />
-          <h2 className="text-lg font-semibold text-navy-900">Print Report</h2>
-        </div>
-        <div className="max-w-2xl">
-          <RestReport />
-        </div>
-      </div>
+        {/* ── Tab 5: Print Report ───────────────────────────────────── */}
+        <TabsContent value="report">
+          <div className="max-w-2xl">
+            <RestReport />
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* ── AI Sleep Coach Section ───────────────────────────────────── */}
       <div className="space-y-4">
