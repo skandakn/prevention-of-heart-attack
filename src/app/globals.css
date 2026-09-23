@@ -69,3 +69,23 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* ── Print styles ────────────────────────────────────────────────────────── */
+@media print {
+  /* Hide everything except the report */
+  body > * { display: none !important; }
+  #fitness-report-printable { display: block !important; }
+
+  /* Reset body for clean print */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+  }
+
+  /* Ensure colours print correctly */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

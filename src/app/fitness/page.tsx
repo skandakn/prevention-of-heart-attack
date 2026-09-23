@@ -5,6 +5,7 @@ import { WorkoutPlanCard } from "@/components/fit-rest/WorkoutPlanCard";
 import { FitnessAIChat } from "@/components/fitness/FitnessAIChat";
 import { FitnessProfileForm } from "@/components/fitness/FitnessProfileForm";
 import { GoogleFitSync } from "@/components/fitness/GoogleFitSync";
+import { FitnessReport } from "@/components/fitness/FitnessReport";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DisclaimerBanner } from "@/components/layout/Footer";
@@ -542,6 +543,17 @@ function FitnessPageInner() {
         </div>
         <div className="max-w-2xl">
           <GoogleFitSync />
+        </div>
+      </div>
+
+      {/* ── Print Fitness Report Section ──────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <History className="h-5 w-5 text-navy-600" />
+          <h2 className="text-lg font-semibold text-navy-900">Print Report</h2>
+        </div>
+        <div className="max-w-2xl">
+          <FitnessReport />
         </div>
       </div>
 
