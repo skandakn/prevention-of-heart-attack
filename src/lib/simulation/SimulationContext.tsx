@@ -172,8 +172,15 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
     localStorage.setItem("beatahead-settings", JSON.stringify(settings));
   }, [settings]);
 
+  const matrixAFeaturesRef = useRef<MatrixAFeatureVector | null>(simulationData.matrixAFeatures);
+  matrixAFeaturesRef.current = matrixAFeatures;
+  const modelProbabilityRef = useRef<number | null>(modelProbability);
+  modelProbabilityRef.current = modelProbability;
+  const simulationDataRef = useRef(simulationData);
+  simulationDataRef.current = simulationData;
+
   const evaluateModel = useCallback(async (customFeats?: MatrixAFeatureVector) => {
-    const targetFeats = customFeats ?? matrixAFeatures ?? simulationData.matrixAFeatures;
+    const targetFeats = customFeats ?? matrixAFeaturesRef.current ?? simulationDataRef.current.matrixAFeatures;
     if (!targetFeats || inFlightRef.current) return;
     inFlightRef.current = true;
     try {
@@ -198,24 +205,24 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
     } finally {
       inFlightRef.current = false;
     }
-  }, [matrixAFeatures, simulationData.matrixAFeatures]);
+  }, []);
 
   const initializeData = useCallback((newScenario: DemoScenario) => {
-    const data = buildSimulationData(newScenario, modelProbability);
+    const data = buildSimulationData(newScenario, modelProbabilityRef.current);
     setSimulationData(data);
     setMatrixAFeatures(data.matrixAFeatures);
     previousSampleRef.current = data.currentSample;
     evaluateModel(data.matrixAFeatures);
-  }, [modelProbability, evaluateModel]);
+  }, [evaluateModel]);
 
   useEffect(() => {
     if (isFirstScenarioEffect.current) {
       isFirstScenarioEffect.current = false;
-      evaluateModel(simulationData.matrixAFeatures);
+      evaluateModel(simulationDataRef.current.matrixAFeatures);
       return;
     }
     initializeData(scenario);
-  }, [scenario, initializeData, evaluateModel, simulationData.matrixAFeatures]);
+  }, [scenario, initializeData, evaluateModel]);
 
   const tick = useCallback(() => {
     tickCounterRef.current++;
@@ -245,7 +252,7 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
           ecg: newSample.ecg,
           imu: newSample.imu,
         },
-        modelProbability: modelProbability !== null ? modelProbability : undefined,
+        modelProbability: modelProbabilityRef.current !== null ? modelProbabilityRef.current : undefined,
       });
 
       previousSampleRef.current = newSample;
@@ -265,7 +272,7 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
         samples: [...prev.samples.slice(-119), newSample],
       };
     });
-  }, [scenario, baseline, modelProbability, evaluateModel]);
+  }, [scenario, baseline, evaluateModel]);
 
   useEffect(() => {
     if (isRunning) {
