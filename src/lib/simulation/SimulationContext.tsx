@@ -24,6 +24,10 @@ import { DEFAULT_BASELINE } from "@/lib/isi/baseline";
 import { extractFeatures } from "@/lib/isi/features";
 import { calculateISI } from "@/lib/isi/scoring";
 import {
+  extractMatrixAFeatures,
+  type MatrixAFeatureVector,
+} from "@/lib/isi/matrix_a";
+import {
   generateHistoricalData,
   generateSample,
   generateTimeline,
@@ -36,10 +40,11 @@ interface SimulationData {
   currentSample: PhysiologicalSample;
   currentScore: ISIScore;
   features: FeatureSet;
+  matrixAFeatures: MatrixAFeatureVector;
   timeline: TimelineEvent[];
 }
 
-function buildSimulationData(newScenario: DemoScenario): SimulationData {
+function buildSimulationData(newScenario: DemoScenario, initialModelProb?: number | null): SimulationData {
   resetSimulation();
   const { samples: historicalSamples } = generateHistoricalData(newScenario, 60);
   const historicalScores: ISIScore[] = [];
@@ -54,6 +59,9 @@ function buildSimulationData(newScenario: DemoScenario): SimulationData {
       scenario: newScenario,
       signalQuality: sample.signalQuality.overall,
       timestamp: sample.timestamp,
+      modelProbability: (i === historicalSamples.length - 1 && initialModelProb !== undefined && initialModelProb !== null)
+        ? initialModelProb
+        : undefined,
     });
     historicalScores.push(score);
   });
@@ -65,6 +73,12 @@ function buildSimulationData(newScenario: DemoScenario): SimulationData {
     historicalSamples[historicalSamples.length - 2] ?? null,
     newScenario
   );
+  const lastMatrixA = extractMatrixAFeatures(
+    lastSample,
+    historicalSamples[historicalSamples.length - 2] ?? null,
+    newScenario,
+    historicalSamples.length
+  );
 
   return {
     samples: historicalSamples,
@@ -72,6 +86,7 @@ function buildSimulationData(newScenario: DemoScenario): SimulationData {
     currentSample: lastSample,
     currentScore: lastScore,
     features: lastFeatures,
+    matrixAFeatures: lastMatrixA,
     timeline: generateTimeline(newScenario),
   };
 }
@@ -98,6 +113,13 @@ interface SimulationContextValue extends SimulationState {
   updateSettings: (settings: Partial<SimulationSettings>) => void;
   showToast: (message: string) => void;
   toastMessage: string | null;
+  matrixAFeatures: MatrixAFeatureVector | null;
+  modelProbability: number | null;
+  modelAlert: boolean;
+  modelThreshold: number;
+  mlServiceStatus: "healthy" | "unavailable" | "evaluating";
+  lastEvaluatedAt: string | null;
+  evaluateModel: () => Promise<void>;
 }
 
 const DEFAULT_SETTINGS: SimulationSettings = {
@@ -117,6 +139,18 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
   const [baseline] = useState<PersonalBaseline>(DEFAULT_BASELINE);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [settings, setSettings] = useState<SimulationSettings>(DEFAULT_SETTINGS);
+  
+  // Real ML Model inference state
+  const [matrixAFeatures, setMatrixAFeatures] = useState<MatrixAFeatureVector | null>(
+    () => simulationData.matrixAFeatures
+  );
+  const [modelProbability, setModelProbability] = useState<number | null>(null);
+  const [modelAlert, setModelAlert] = useState<boolean>(false);
+  const [mlServiceStatus, setMlServiceStatus] = useState<"healthy" | "unavailable" | "evaluating">("evaluating");
+  const [lastEvaluatedAt, setLastEvaluatedAt] = useState<string | null>(null);
+  const inFlightRef = useRef<boolean>(false);
+  const tickCounterRef = useRef<number>(0);
+
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const previousSampleRef = useRef<PhysiologicalSample | null>(simulationData.currentSample);
   const isFirstScenarioEffect = useRef(true);
@@ -138,25 +172,64 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
     localStorage.setItem("beatahead-settings", JSON.stringify(settings));
   }, [settings]);
 
+  const evaluateModel = useCallback(async (customFeats?: MatrixAFeatureVector) => {
+    const targetFeats = customFeats ?? matrixAFeatures ?? simulationData.matrixAFeatures;
+    if (!targetFeats || inFlightRef.current) return;
+    inFlightRef.current = true;
+    try {
+      const res = await fetch("/api/ml/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ features: targetFeats })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.probability === "number") {
+          setModelProbability(data.probability);
+          setModelAlert(data.prediction === 1 || data.probability >= (data.threshold || 0.156742));
+          setMlServiceStatus("healthy");
+          setLastEvaluatedAt(new Date().toLocaleTimeString());
+        }
+      } else {
+        setMlServiceStatus("unavailable");
+      }
+    } catch {
+      setMlServiceStatus("unavailable");
+    } finally {
+      inFlightRef.current = false;
+    }
+  }, [matrixAFeatures, simulationData.matrixAFeatures]);
+
   const initializeData = useCallback((newScenario: DemoScenario) => {
-    const data = buildSimulationData(newScenario);
+    const data = buildSimulationData(newScenario, modelProbability);
     setSimulationData(data);
+    setMatrixAFeatures(data.matrixAFeatures);
     previousSampleRef.current = data.currentSample;
-  }, []);
+    evaluateModel(data.matrixAFeatures);
+  }, [modelProbability, evaluateModel]);
 
   useEffect(() => {
     if (isFirstScenarioEffect.current) {
       isFirstScenarioEffect.current = false;
+      evaluateModel(simulationData.matrixAFeatures);
       return;
     }
     initializeData(scenario);
-  }, [scenario, initializeData]);
+  }, [scenario, initializeData, evaluateModel, simulationData.matrixAFeatures]);
 
   const tick = useCallback(() => {
+    tickCounterRef.current++;
     setSimulationData((prev) => {
       const previousSample = previousSampleRef.current ?? prev.currentSample;
       const newSample = generateSample(scenario);
       const newFeatures = extractFeatures(newSample, previousSample, scenario);
+      const newMatrixA = extractMatrixAFeatures(
+        newSample,
+        previousSample,
+        scenario,
+        prev.history.length
+      );
+      
       const newScore = calculateISI({
         features: newFeatures,
         baseline,
@@ -164,19 +237,35 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
         scenario,
         signalQuality: newSample.signalQuality.overall,
         timestamp: newSample.timestamp,
+        rawSample: {
+          heartRate: newSample.heartRate,
+          hrv: newSample.hrv,
+          spo2: newSample.spo2,
+          ppg: newSample.ppg,
+          ecg: newSample.ecg,
+          imu: newSample.imu,
+        },
+        modelProbability: modelProbability !== null ? modelProbability : undefined,
       });
 
       previousSampleRef.current = newSample;
+
+      // Periodically re-evaluate ML service every 10 ticks (e.g. 10s)
+      if (tickCounterRef.current % 10 === 0) {
+        evaluateModel(newMatrixA);
+      }
+
       return {
         ...prev,
         currentSample: newSample,
         currentScore: newScore,
         features: newFeatures,
+        matrixAFeatures: newMatrixA,
         history: [...prev.history.slice(-119), newScore],
         samples: [...prev.samples.slice(-119), newSample],
       };
     });
-  }, [scenario, baseline]);
+  }, [scenario, baseline, modelProbability, evaluateModel]);
 
   useEffect(() => {
     if (isRunning) {
@@ -222,13 +311,13 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
 
   const systemStatus: SystemStatus = useMemo(
     () => ({
-      aiEngine: "online",
+      aiEngine: mlServiceStatus === "healthy" ? "online" : mlServiceStatus === "evaluating" ? "online" : "offline",
       sensorStream: "simulated",
       signalProcessing: isRunning ? "active" : "inactive",
       isiEngine: "active",
       dataSync: "connected",
     }),
-    [isRunning]
+    [isRunning, mlServiceStatus]
   );
 
   const value: SimulationContextValue = {
@@ -251,6 +340,13 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
     updateSettings,
     showToast,
     toastMessage,
+    matrixAFeatures,
+    modelProbability,
+    modelAlert,
+    modelThreshold: 0.156742,
+    mlServiceStatus,
+    lastEvaluatedAt,
+    evaluateModel,
   };
 
   return (

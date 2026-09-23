@@ -7,6 +7,13 @@ import type {
   TrendDirection,
 } from "./types";
 import { getISILabel } from "@/lib/utils";
+import {
+  calculateCompositeISI,
+  computeModelEvidence,
+  computeTrendMomentum,
+  TAU_FROZEN,
+  type EngineInput
+} from "./engine";
 
 export interface ScoringInput {
   features: FeatureSet;
@@ -15,81 +22,127 @@ export interface ScoringInput {
   scenario: DemoScenario;
   signalQuality: number;
   timestamp?: number;
+  rawSample?: {
+    heartRate: number;
+    hrv: number;
+    spo2: number;
+    ppg: number;
+    ecg: number;
+    imu: number;
+  };
+  modelProbability?: number;
 }
 
 /**
- * Prototype ISI scoring engine.
- * Replace this function with a real XGBoost model inference call in production.
+ * Maps simulation scenarios to simulated XGBoost model probabilities.
+ * Normal: sub-threshold surgical baseline (~0.005)
+ * Stress Event: rises past threshold (0.156742) to ~0.35 then recovers
+ * Persistent Rising: climbs past threshold to ~0.45
+ * Recovering: descending from ~0.20 to baseline
+ * Motion Artifact: degraded quality
+ */
+function getSimulatedModelProbability(scenario: DemoScenario, tickCount: number): number {
+  const t = tickCount / 100.0;
+  switch (scenario) {
+    case "normal":
+      return Math.max(0.002, 0.006 + Math.sin(t * 0.5) * 0.002);
+    case "stress_event":
+      if (t < 0.3) return 0.02 + Math.sin(t * 2) * 0.01;
+      if (t < 0.6) return 0.16 + (t - 0.3) * 0.6; // Crosses 0.156742 threshold
+      return Math.max(0.01, 0.34 - (t - 0.6) * 0.7);
+    case "persistent_rising":
+      return Math.min(0.55, 0.08 + t * 0.4);
+    case "recovering":
+      return Math.max(0.005, 0.20 - t * 0.18);
+    case "motion_artifact":
+      return 0.05 + Math.sin(t * 3) * 0.03;
+    default:
+      return 0.01;
+  }
+}
+
+/**
+ * BeatAhead Phase 9 ISI scoring engine.
+ * Calls the audited Phase 8.1 mathematical engine.
  */
 export function calculateISI(input: ScoringInput): ISIScore {
-  const { features, baseline, historicalScores, scenario, signalQuality, timestamp } = input;
+  const { features, baseline, historicalScores, scenario, signalQuality, timestamp, rawSample } = input;
 
-  const hrvFactor = normalizeDeviation(features.hrv.deviation, -15, 15);
-  const pulseFactor = normalizeDeviation(features.pulseMorphology.deviation, -10, 20);
-  const spo2Factor = normalizeDeviation(features.spo2Trend.deviation, -3, 3);
-  const ecgFactor = normalizeDeviation(features.ecg.deviation, -10, 25);
-  const motionFactor = features.imu.artifactDetected ? 0.8 : Math.min(features.imu.motionIntensity, 0.5);
+  const hr = rawSample?.heartRate ?? features.ecg.heartRate;
+  const sdnn = rawSample?.hrv ?? features.hrv.sdnn;
+  const spo2 = rawSample?.spo2 ?? features.spo2Trend.average;
+  const motionIntensity = rawSample?.imu ? Math.abs(rawSample.imu) : features.imu.motionIntensity;
+  const ppgVal = rawSample?.ppg ?? 0.85;
 
-  const contributions: ISIContributions = {
-    hrv: hrvFactor * 0.28,
-    pulseMorphology: pulseFactor * 0.22,
-    spo2Trend: spo2Factor * 0.18,
-    ecg: ecgFactor * 0.2,
-    motionArtifact: motionFactor * 0.12,
+  const modelProb = (input.modelProbability !== undefined && input.modelProbability !== null)
+    ? input.modelProbability
+    : getSimulatedModelProbability(scenario, historicalScores.length);
+  const isPatValid = scenario !== "motion_artifact" && signalQuality >= 60;
+
+  const engineInput: EngineInput = {
+    modelProbability: modelProb,
+    ecg: {
+      heartRate: hr,
+      sdnn: sdnn,
+      sqi: signalQuality / 100.0,
+    },
+    ppg: {
+      sqi: signalQuality / 100.0,
+      pulseAmp: ppgVal * 2000.0,
+    },
+    pat: {
+      medianMs: 225.0 - (hr - baseline.restingHR) * 0.5,
+      valid: isPatValid,
+    },
+    spo2: {
+      current: spo2,
+      available: true,
+    },
+    imu: {
+      motionIntensity: motionIntensity,
+      artifactDetected: features.imu.artifactDetected,
+    },
+    monitoringTimeSeconds: Math.max(650.0, historicalScores.length * 5.0),
+    recentIsiHistory: historicalScores,
   };
 
-  const rawScore =
-    baseline.isi +
-    contributions.hrv * 35 +
-    contributions.pulseMorphology * 30 +
-    contributions.spo2Trend * 25 +
-    contributions.ecg * 35 +
-    contributions.motionArtifact * 20;
+  const output = calculateCompositeISI(engineInput);
 
-  const scenarioModifier = getScenarioModifier(scenario, historicalScores.length);
-  const adjustedScore = rawScore * scenarioModifier;
-
-  const score = Math.round(Math.max(0, Math.min(100, adjustedScore)));
-  const trend = calculateTrend(score, historicalScores);
+  const trend = calculateTrend(output.isi, historicalScores);
   const confidence = Math.round(
-    Math.max(40, Math.min(95, signalQuality * 0.85 - contributions.motionArtifact * 30))
+    Math.max(30, Math.min(98, output.signalQuality * 100 - (features.imu.artifactDetected ? 35 : 0)))
   );
+
+  const contributions: ISIContributions = {
+    hrv: output.components.autonomic * 0.5,
+    pulseMorphology: output.components.perfusion * 0.4,
+    spo2Trend: output.components.perfusion * 0.6,
+    ecg: output.components.autonomic * 0.5,
+    motionArtifact: motionIntensity * 0.5,
+    modelEvidence: output.components.modelEvidence,
+    autonomic: output.components.autonomic,
+    perfusion: output.components.perfusion,
+    trend: output.components.trend,
+  };
 
   return {
     timestamp: timestamp ?? Date.now(),
-    score,
-    baseline: baseline.isi,
+    score: output.isi,
+    rawScore: output.rawIsi,
+    baseline: Math.round(baseline.isi),
     trend,
     confidence,
     contributions,
-    label: getISILabel(score),
-    deviation: score - baseline.isi,
+    label: getISILabel(output.isi),
+    deviation: output.isi - Math.round(baseline.isi),
+    modelProbability: output.modelProbability,
+    modelEvidence: output.components.modelEvidence,
+    modelAlert: output.modelAlert,
+    state: output.state,
+    signalQuality: output.signalQuality,
+    baselineStatus: output.baselineStatus,
+    trendMomentum: output.trendMomentum,
   };
-}
-
-function normalizeDeviation(deviation: number, min: number, max: number): number {
-  const clamped = Math.max(min, Math.min(max, deviation));
-  return (clamped - min) / (max - min);
-}
-
-function getScenarioModifier(scenario: DemoScenario, tickCount: number): number {
-  const t = tickCount / 100;
-  switch (scenario) {
-    case "normal":
-      return 0.84 + Math.sin(t * 0.5) * 0.04;
-    case "stress_event":
-      if (t < 0.3) return 0.95 + Math.sin(t * 2) * 0.05;
-      if (t < 0.6) return 1.0 + (t - 0.3) * 0.5;
-      return 1.15 - (t - 0.6) * 0.4;
-    case "recovering":
-      return 1.1 - t * 0.25;
-    case "persistent_rising":
-      return 0.95 + t * 0.35;
-    case "motion_artifact":
-      return 1.0 + Math.sin(t * 3) * 0.15;
-    default:
-      return 1.0;
-  }
 }
 
 function calculateTrend(currentScore: number, historicalScores: number[]): TrendDirection {

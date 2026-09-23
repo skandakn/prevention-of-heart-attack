@@ -9,6 +9,13 @@ export type TrendDirection = "increasing" | "decreasing" | "stable";
 
 export type SignalQualityLevel = "excellent" | "good" | "fair" | "poor";
 
+export type ProductState =
+  | "Insufficient Signal Quality"
+  | "Baseline Establishing"
+  | "Normal / Stable"
+  | "Elevated Model Evidence"
+  | "Elevated ISI Trend";
+
 export interface PhysiologicalSample {
   timestamp: number;
   ppg: number;
@@ -67,17 +74,29 @@ export interface ISIContributions {
   spo2Trend: number;
   ecg: number;
   motionArtifact: number;
+  modelEvidence: number;
+  autonomic: number;
+  perfusion: number;
+  trend: number;
 }
 
 export interface ISIScore {
   timestamp: number;
   score: number;
+  rawScore: number;
   baseline: number;
   trend: TrendDirection;
   confidence: number;
   contributions: ISIContributions;
   label: string;
   deviation: number;
+  modelProbability: number;
+  modelEvidence: number;
+  modelAlert: boolean;
+  state: ProductState;
+  signalQuality: number;
+  baselineStatus: string;
+  trendMomentum: number;
 }
 
 export interface PersonalBaseline {
@@ -140,15 +159,15 @@ export const SIMULATED_DATA_LABEL =
   "All displayed physiological signals are simulated and do not represent a real patient's measurements.";
 
 export const ISI_RANGE_LABELS = {
-  low: { range: "0–30", label: "Lower observed trend" },
-  intermediate: { range: "31–60", label: "Intermediate observed trend" },
-  high: { range: "61–100", label: "Higher observed trend" },
+  low: { range: "0-30", label: "Lower observed trend" },
+  intermediate: { range: "31-60", label: "Intermediate observed trend" },
+  high: { range: "61-100", label: "Higher observed trend" },
 } as const;
 
 export const DEMO_SCENARIOS: { id: DemoScenario; label: string; description: string }[] = [
-  { id: "normal", label: "Normal", description: "ISI ≈ 40–50, stable baseline" },
-  { id: "stress_event", label: "Stress Event", description: "ISI rises to 60–70 then recovers" },
+  { id: "normal", label: "Normal", description: "ISI ~ 35-45, stable baseline" },
+  { id: "stress_event", label: "Stress Event", description: "Model evidence & autonomic strain rise then recover" },
   { id: "recovering", label: "Recovering", description: "ISI gradually returning to baseline" },
-  { id: "persistent_rising", label: "Persistent Rising Trend", description: "ISI gradually increases over time" },
-  { id: "motion_artifact", label: "Motion Artifact", description: "Signal quality decreases, confidence falls" },
+  { id: "persistent_rising", label: "Persistent Rising Trend", description: "Model evidence and ISI gradually increase" },
+  { id: "motion_artifact", label: "Motion Artifact", description: "Signal quality decreases, triggers quality gate" },
 ];

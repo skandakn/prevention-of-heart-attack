@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DisclaimerBanner } from "@/components/layout/Footer";
 import { SimulatedBadge } from "@/components/layout/Toast";
 import { useSimulation } from "@/lib/simulation/SimulationContext";
-import { Play, Pause, RotateCcw, AlertTriangle } from "lucide-react";
+import { Play, Pause, RotateCcw, AlertTriangle, Cpu, ShieldAlert, CheckCircle2 } from "lucide-react";
 import { ISITrendChart } from "@/components/charts/ISITrendChart";
 
 export default function MonitorPage() {
@@ -19,6 +19,9 @@ export default function MonitorPage() {
     resetMonitoring,
     motionArtifactDetected,
     currentSample,
+    currentScore,
+    modelProbability,
+    modelAlert,
     settings,
   } = useSimulation();
 
@@ -30,12 +33,15 @@ export default function MonitorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const prob = currentScore?.modelProbability ?? modelProbability ?? null;
+  const isAlert = currentScore?.modelAlert ?? modelAlert ?? false;
+
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-navy-900">Live Monitor</h1>
-          <p className="text-sm text-navy-500">Real-time simulated physiological signals</p>
+          <p className="text-sm text-navy-500">Real-time simulated physiological signals & machine learning inference</p>
         </div>
         <SimulatedBadge />
       </div>
@@ -67,6 +73,21 @@ export default function MonitorPage() {
         </div>
       )}
 
+      {/* Model Alert Banner if threshold exceeded */}
+      {isAlert && (
+        <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg bg-rose-50 border border-rose-300 text-rose-900 text-sm">
+          <div className="flex items-center gap-2 font-medium">
+            <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0" />
+            <span>
+              Early-Warning Alert: Frozen XGBoost probability ({prob !== null ? (prob * 100).toFixed(1) + "%" : "--"}) exceeds research threshold (15.67%).
+            </span>
+          </div>
+          <span className="text-xs bg-rose-200 text-rose-800 px-2 py-0.5 rounded font-mono font-bold">
+            τ = 0.156742
+          </span>
+        </div>
+      )}
+
       {/* Signal panels */}
       <div className="grid sm:grid-cols-2 gap-4">
         <SignalPanel type="ppg" title="PPG" subtitle="Pulse waveform" />
@@ -77,17 +98,40 @@ export default function MonitorPage() {
 
       {/* Signal processing pipeline */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Signal Processing Pipeline</CardTitle>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Cpu className="w-4 h-4 text-indigo-600" />
+              End-to-End Processing & ML Inference Pipeline
+            </CardTitle>
+            <span className="text-xs text-slate-500 font-mono">
+              XGBoost Matrix A (26 Features) • Frozen v1.0.0
+            </span>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm">
-            {["Raw Signal", "Filtered Signal", "Artifact Rejection", "Feature Extraction"].map((step, i) => (
-              <div key={step} className="flex items-center gap-2 sm:gap-4">
-                <div className={`px-4 py-2 rounded-lg text-center ${i === 3 ? "bg-navy-900 text-white" : "bg-navy-50 text-navy-700 border border-navy-100"}`}>
-                  {step}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 text-xs">
+            {[
+              { name: "Simulated Signals", detail: "ECG, PPG, SpO2, IMU" },
+              { name: "Artifact Rejection", detail: "SQI Filtering" },
+              { name: "Matrix A Extraction", detail: "26 Canonical Features" },
+              { name: "Frozen XGBoost", detail: "p_model (τ = 0.156742)" },
+              { name: "Composite ISI", detail: "0–100 Product Score" },
+            ].map((step, i) => (
+              <div key={step.name} className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                <div className={`p-2.5 rounded-lg text-center flex-1 sm:flex-initial min-w-[130px] ${
+                  i === 3 
+                    ? isAlert 
+                      ? "bg-rose-900 text-white shadow-sm" 
+                      : "bg-indigo-900 text-white shadow-sm" 
+                    : i === 4
+                    ? "bg-navy-900 text-white shadow-sm"
+                    : "bg-navy-50 text-navy-700 border border-navy-100"
+                }`}>
+                  <p className="font-semibold">{step.name}</p>
+                  <p className="text-[10px] opacity-80 mt-0.5">{step.detail}</p>
                 </div>
-                {i < 3 && <span className="text-navy-300 hidden sm:inline">→</span>}
+                {i < 4 && <span className="text-navy-300 hidden sm:inline">→</span>}
               </div>
             ))}
           </div>

@@ -13,7 +13,7 @@ import { ISIGauge } from "@/components/isi/ISIGauge";
 import { ContributionBars } from "@/components/isi/ContributionBars";
 import { ISITrendChart } from "@/components/charts/ISITrendChart";
 import { BaselineCard } from "@/components/isi/BaselineCard";
-import { Download, ChevronRight } from "lucide-react";
+import { Download, ChevronRight, Cpu } from "lucide-react";
 import type { PatientRecord } from "@/lib/isi/types";
 import { MEDICAL_DISCLAIMER } from "@/lib/isi/types";
 
@@ -28,6 +28,17 @@ export default function ClinicianPage() {
     const report = {
       generated: new Date().toISOString(),
       patient: selected?.id ?? "All",
+      model_provenance: {
+        model_name: "BeatAhead Phase 5 XGBoost",
+        model_version: "1.0.0-phase5-frozen",
+        schema_version: "1.0.0",
+        feature_matrix: "26-feature Matrix A",
+        decision_threshold: 0.156742,
+        selection_metric: "F1 maximization",
+        intended_use: "Research prototype for prospective early-warning trend analysis (300s window + 300s buffer + 300s horizon)",
+        regulatory_status: "Investigational research prototype — Not FDA approved for diagnostic use",
+        artifact_hash: "528ff3f8f5edac6f3baf5aef8715d5e86f478462d76ac574b9f0ec60e8640808",
+      },
       disclaimer: MEDICAL_DISCLAIMER,
       note: "Clinical decision support prototype — not a diagnostic system.",
       data: selected ?? patients,
@@ -58,8 +69,14 @@ export default function ClinicianPage() {
 
       <DisclaimerBanner />
 
-      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800">
-        Clinical decision support prototype — not a diagnostic system. Supports clinical follow-up.
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800">
+        <div>
+          Clinical decision support prototype — not a diagnostic system. Supports clinical follow-up.
+        </div>
+        <div className="flex items-center gap-2 shrink-0 font-mono text-[11px] text-blue-900">
+          <Cpu className="w-3.5 h-3.5" />
+          <span>Model: BeatAhead Phase 5 XGBoost (τ = 0.156742)</span>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
