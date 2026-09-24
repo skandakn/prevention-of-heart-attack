@@ -41,36 +41,95 @@ export function checkIsClerkConfigured(): boolean {
   return true;
 }
 
+function getStoredDemoUser(): BeatAheadUser | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = localStorage.getItem("beatahead_demo_session");
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return null;
+}
+
+function persistDemoUser(user: BeatAheadUser | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (user) {
+      const serialized = JSON.stringify(user);
+      localStorage.setItem("beatahead_demo_session", serialized);
+      document.cookie = `beatahead_demo_session=${encodeURIComponent(serialized)}; path=/; max-age=2592000; SameSite=Lax`;
+    } else {
+      localStorage.removeItem("beatahead_demo_session");
+      document.cookie = "beatahead_demo_session=; path=/; max-age=0; SameSite=Lax";
+    }
+  } catch (e) {
+    console.error("Error persisting auth session:", e);
+  }
+}
+
 function ClerkAuthBridge({ children }: { children: React.ReactNode }) {
-  const { isSignedIn, isLoaded, userId } = useAuth();
+  const { isSignedIn: clerkSignedIn, isLoaded: clerkLoaded, userId: clerkUserId } = useAuth();
   const { user: clerkUser } = useUser();
   const { signOut: clerkSignOut } = useClerk();
   const router = useRouter();
 
-  const user: BeatAheadUser | null = clerkUser
+  const [demoUser, setDemoUser] = useState<BeatAheadUser | null>(null);
+  const [demoLoaded, setDemoLoaded] = useState(false);
+
+  useEffect(() => {
+    setDemoUser(getStoredDemoUser());
+    setDemoLoaded(true);
+  }, []);
+
+  const signInDemoUser = useCallback(
+    (demoUserArg?: { email?: string; name?: string; imageUrl?: string }) => {
+      const newUser: BeatAheadUser = {
+        id: `user_google_${Date.now()}`,
+        fullName: demoUserArg?.name || "Skand Sharma",
+        email: demoUserArg?.email || "skand.sharma@gmail.com",
+        imageUrl:
+          demoUserArg?.imageUrl ||
+          "https://lh3.googleusercontent.com/a/ACg8ocIq_placeholder=s96-c",
+      };
+      setDemoUser(newUser);
+      persistDemoUser(newUser);
+    },
+    []
+  );
+
+  const handleSignOut = async () => {
+    setDemoUser(null);
+    persistDemoUser(null);
+    if (clerkSignedIn && clerkSignOut) {
+      try {
+        await clerkSignOut();
+      } catch (e) {
+        console.error("Error signing out from Clerk:", e);
+      }
+    }
+    router.push("/sign-in");
+  };
+
+  const isEffectiveSignedIn = Boolean(clerkSignedIn) || Boolean(demoUser);
+  const effectiveUserId = clerkUserId || demoUser?.id || null;
+  const effectiveUser: BeatAheadUser | null = clerkUser
     ? {
         id: clerkUser.id,
         fullName: clerkUser.fullName || clerkUser.firstName || "User",
         email: clerkUser.primaryEmailAddress?.emailAddress || null,
         imageUrl: clerkUser.imageUrl,
       }
-    : null;
-
-  const handleSignOut = async () => {
-    await clerkSignOut();
-    router.push("/sign-in");
-  };
+    : demoUser;
 
   return (
     <BeatAheadAuthContext.Provider
       value={{
         isConfigured: true,
-        isSignedIn: Boolean(isSignedIn),
-        isLoaded: Boolean(isLoaded),
-        userId: userId || null,
-        user,
+        isSignedIn: isEffectiveSignedIn,
+        isLoaded: Boolean(clerkLoaded && demoLoaded),
+        userId: effectiveUserId,
+        user: effectiveUser,
         signOut: handleSignOut,
-        signInDemoUser: () => {},
+        signInDemoUser,
       }}
     >
       {children}
@@ -84,16 +143,8 @@ function UnconfiguredAuthBridge({ children }: { children: React.ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("beatahead_demo_session");
-      if (stored) {
-        setSessionUser(JSON.parse(stored));
-      }
-    } catch (e) {
-      console.error("Error reading auth session:", e);
-    } finally {
-      setIsLoaded(true);
-    }
+    setSessionUser(getStoredDemoUser());
+    setIsLoaded(true);
   }, []);
 
   const signInDemoUser = useCallback(
@@ -107,22 +158,14 @@ function UnconfiguredAuthBridge({ children }: { children: React.ReactNode }) {
           "https://lh3.googleusercontent.com/a/ACg8ocIq_placeholder=s96-c",
       };
       setSessionUser(newUser);
-      try {
-        localStorage.setItem("beatahead_demo_session", JSON.stringify(newUser));
-      } catch (e) {
-        console.error("Error saving auth session:", e);
-      }
+      persistDemoUser(newUser);
     },
     []
   );
 
   const signOut = useCallback(async () => {
     setSessionUser(null);
-    try {
-      localStorage.removeItem("beatahead_demo_session");
-    } catch (e) {
-      console.error("Error clearing auth session:", e);
-    }
+    persistDemoUser(null);
     router.push("/sign-in");
   }, [router]);
 
@@ -165,7 +208,7 @@ export function SafeUserButton(props: React.ComponentProps<typeof UserButton>) {
   const { isConfigured, isSignedIn, user, signOut } = useBeatAheadAuth();
   if (!isSignedIn) return null;
 
-  if (isConfigured) {
+  if (isConfigured && user && !user.id.startsWith("user_google_")) {
     return <UserButton {...props} />;
   }
 

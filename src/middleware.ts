@@ -32,12 +32,24 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 const activeClerkMiddleware = clerkMiddleware(async (auth, req) => {
+  // Allow access if user is authenticated via demo session
+  const demoCookie = req.cookies.get("beatahead_demo_session");
+  if (demoCookie?.value) {
+    return;
+  }
+
   if (!isPublicRoute(req)) {
     await auth.protect();
   }
 });
 
 export default function middleware(req: NextRequest, evt: NextFetchEvent) {
+  // Allow access if user is authenticated via demo session
+  const demoCookie = req.cookies.get("beatahead_demo_session");
+  if (demoCookie?.value) {
+    return NextResponse.next();
+  }
+
   if (!isClerkKeyValid()) {
     return NextResponse.next();
   }

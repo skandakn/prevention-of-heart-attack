@@ -216,6 +216,12 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
   }, [evaluateModel]);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const p = window.location.pathname;
+      if (p.startsWith("/sign-in") || p.startsWith("/sign-up")) {
+        return;
+      }
+    }
     if (isFirstScenarioEffect.current) {
       isFirstScenarioEffect.current = false;
       evaluateModel(simulationDataRef.current.matrixAFeatures);

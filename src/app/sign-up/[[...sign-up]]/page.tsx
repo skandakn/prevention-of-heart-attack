@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SignUp } from "@clerk/nextjs";
-import { Heart, Mail, Lock, User, X, LogOut } from "lucide-react";
+import { Heart, Mail, Lock, User, Check, X, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { checkIsClerkConfigured, useBeatAheadAuth } from "@/lib/auth/ClerkAuthWrapper";
 import { SplineBackground } from "@/components/ui/SplineBackground";
@@ -21,6 +21,7 @@ export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showClerk, setShowClerk] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   const googleAccounts = [
@@ -106,35 +107,69 @@ export default function SignUpPage() {
           <span className="text-xl font-bold tracking-tight text-white">BeatAhead</span>
         </Link>
 
-        {isClerkConfigured ? (
-          <SignUp
-            path="/sign-up"
-            routing="path"
-            signInUrl="/sign-in"
-            fallbackRedirectUrl="/health-record?onboarding=true"
-            appearance={{
-              elements: {
-                rootBox: "w-full",
-                card: "bg-transparent shadow-none p-0 w-full",
-                headerTitle: "text-white font-bold text-xl text-center",
-                headerSubtitle: "text-navy-400 text-xs text-center",
-                socialButtonsBlockButton: "bg-white hover:bg-navy-50 text-navy-950 font-semibold rounded-xl py-2.5 flex justify-center items-center gap-2 transition-colors w-full text-sm shadow-md border border-navy-200",
-                socialButtonsBlockButtonText: "text-navy-950 font-semibold text-sm",
-                dividerLine: "bg-navy-800",
-                dividerText: "text-navy-400 text-xs font-medium",
-                formButtonPrimary: "bg-cardiac hover:bg-red-700 text-white font-semibold py-2.5 rounded-xl transition-all shadow-md active:scale-[0.99] w-full",
-                formFieldLabel: "text-navy-200 text-xs font-semibold uppercase tracking-wider text-left",
-                formFieldInput: "bg-navy-950/80 border border-navy-800 focus:border-cardiac rounded-xl text-white placeholder-navy-500",
-                footerActionText: "text-navy-400 text-xs",
-                footerActionLink: "text-red-400 hover:text-red-300 font-semibold text-xs transition-colors",
-              },
-              variables: {
-                colorPrimary: "#DC2626",
-                colorBackground: "#0F172A",
-                borderRadius: "0.75rem",
-              },
-            }}
-          />
+        {isSignedIn ? (
+          <div className="w-full space-y-6 py-4 text-center">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
+              <Check className="w-8 h-8" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Active Account Found</h2>
+              <p className="text-sm font-semibold text-red-400 mt-1">{user?.fullName || "BeatAhead User"}</p>
+              <p className="text-xs text-navy-400 mt-0.5">{user?.email}</p>
+            </div>
+            <div className="space-y-2.5 pt-2">
+              <Link href="/dashboard" className="w-full block">
+                <Button className="w-full h-11 bg-cardiac hover:bg-red-700 text-white font-semibold rounded-xl text-sm shadow-md gap-2">
+                  Open Dashboard
+                  <span aria-hidden="true">&rarr;</span>
+                </Button>
+              </Link>
+              <Button
+                variant="outline"
+                onClick={() => signOut()}
+                className="w-full h-10 border-navy-700 text-navy-300 hover:bg-navy-800 text-xs rounded-xl"
+              >
+                Sign Out / Create New Account
+              </Button>
+            </div>
+          </div>
+        ) : isClerkConfigured && showClerk ? (
+          <div className="w-full space-y-4">
+            <SignUp
+              path="/sign-up"
+              routing="path"
+              signInUrl="/sign-in"
+              fallbackRedirectUrl="/health-record?onboarding=true"
+              appearance={{
+                elements: {
+                  rootBox: "w-full",
+                  card: "bg-transparent shadow-none p-0 w-full",
+                  headerTitle: "text-white font-bold text-xl text-center",
+                  headerSubtitle: "text-navy-400 text-xs text-center",
+                  socialButtonsBlockButton: "bg-white hover:bg-navy-50 text-navy-950 font-semibold rounded-xl py-2.5 flex justify-center items-center gap-2 transition-colors w-full text-sm shadow-md border border-navy-200",
+                  socialButtonsBlockButtonText: "text-navy-950 font-semibold text-sm",
+                  dividerLine: "bg-navy-800",
+                  dividerText: "text-navy-400 text-xs font-medium",
+                  formButtonPrimary: "bg-cardiac hover:bg-red-700 text-white font-semibold py-2.5 rounded-xl transition-all shadow-md active:scale-[0.99] w-full",
+                  formFieldLabel: "text-navy-200 text-xs font-semibold uppercase tracking-wider text-left",
+                  formFieldInput: "bg-navy-950/80 border border-navy-800 focus:border-cardiac rounded-xl text-white placeholder-navy-500",
+                  footerActionText: "text-navy-400 text-xs",
+                  footerActionLink: "text-red-400 hover:text-red-300 font-semibold text-xs transition-colors",
+                },
+                variables: {
+                  colorPrimary: "#DC2626",
+                  colorBackground: "#0F172A",
+                  borderRadius: "0.75rem",
+                },
+              }}
+            />
+            <button
+              onClick={() => setShowClerk(false)}
+              className="text-xs text-navy-400 hover:text-white underline w-full text-center py-2"
+            >
+              &larr; Switch back to 1-Click / Google Sign Up
+            </button>
+          </div>
         ) : (
           <div className="w-full space-y-5 text-left">
             <div className="text-center space-y-1">
@@ -228,6 +263,18 @@ export default function SignUpPage() {
                 {isLoading ? "Creating account..." : "Create Account"}
               </Button>
             </form>
+
+            {isClerkConfigured && (
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowClerk(true)}
+                  className="text-xs text-navy-400 hover:text-white underline"
+                >
+                  Use Organization / Clerk Account Sign Up &rarr;
+                </button>
+              </div>
+            )}
 
             <div className="pt-2 border-t border-navy-800 flex items-center justify-between text-xs">
               <p className="text-navy-400">
