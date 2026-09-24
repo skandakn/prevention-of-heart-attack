@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useFitRest } from "@/lib/fit-rest/FitRestContext";
 import { Button } from "@/components/ui/button";
 import { EXERCISE_TYPE_LABELS } from "@/lib/fit-rest/types";
@@ -29,208 +29,146 @@ function intensityColor(intensity: WorkoutSession["intensity"]): string {
   return "#dc2626";
 }
 
-// ─── Print logic ──────────────────────────────────────────────────────────────
+// ─── Shared print helper — iframe approach (no popup, no stylesheet issues) ──
 
-function printReport(contentId: string) {
-  const el = document.getElementById(contentId);
-  if (!el) return;
-
-  const printWindow = window.open("", "_blank", "width=800,height=700");
-  if (!printWindow) return;
-
-  // Pull in all stylesheets from the current page
-  const styles = Array.from(document.styleSheets)
-    .map((sheet) => {
-      try {
-        return Array.from(sheet.cssRules)
-          .map((rule) => rule.cssText)
-          .join("\n");
-      } catch {
-        // Cross-origin stylesheets will throw — link them instead
-        return sheet.href ? `@import url("${sheet.href}");` : "";
-      }
-    })
-    .join("\n");
-
-  printWindow.document.write(`<!DOCTYPE html>
+function buildPrintHTML(title: string, bodyHTML: string): string {
+  return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8"/>
-  <title>BeatAhead Fitness Report</title>
+  <title>${title}</title>
   <style>
-    ${styles}
-    @media print {
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: white;
+      color: #1e2a3a;
+      padding: 32px;
+      font-size: 13px;
+      line-height: 1.5;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
-    body { font-family: system-ui, sans-serif; background: white; margin: 0; padding: 24px; }
+    h1 { font-size: 22px; font-weight: 800; margin: 0; }
+    h2 { font-size: 14px; font-weight: 700; margin: 0 0 10px; }
+    p  { margin: 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px 12px; text-align: left; }
+    thead tr { background: #f1f5f9; }
+    th { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;
+         letter-spacing: 0.04em; border-bottom: 1px solid #e2e8f0; }
+    tbody tr:nth-child(even) { background: #f8fafc; }
+    tbody tr { border-bottom: 1px solid #f1f5f9; }
+    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
+    .stat-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; }
+    .stat-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-value { font-size: 18px; font-weight: 800; color: #1e2a3a; margin-top: 4px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px;
+             font-weight: 700; text-transform: capitalize; color: white; }
+    .header { border-bottom: 2px solid #dc2626; padding-bottom: 16px; margin-bottom: 24px;
+              display: flex; justify-content: space-between; align-items: flex-start; }
+    .header-right { text-align: right; font-size: 11px; color: #94a3b8; }
+    .footer { margin-top: 36px; padding-top: 16px; border-top: 1px solid #e2e8f0;
+              font-size: 10px; color: #94a3b8; text-align: center; }
+    .empty { text-align: center; padding: 48px 0; color: #94a3b8; }
+    .section-header { background: #1e2a3a; color: white; padding: 10px 14px;
+                      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+    .msg-user { background: #1e2a3a; color: white; padding: 10px 14px; border-radius: 10px;
+                margin: 6px 0; max-width: 88%; margin-left: auto; }
+    .msg-agent { background: #f0fdf4; border: 1px solid #bbf7d0; color: #1e2a3a;
+                 padding: 10px 14px; border-radius: 10px; margin: 6px 0; max-width: 88%; }
+    .msg-role { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                letter-spacing: 0.05em; margin-bottom: 4px; }
+    .msg-time { font-size: 10px; margin-top: 6px; opacity: 0.6; }
+    .two-col { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 28px; }
   </style>
 </head>
-<body>${el.innerHTML}</body>
-</html>`);
-
-  printWindow.document.close();
-  printWindow.focus();
-  setTimeout(() => {
-    printWindow.print();
-    printWindow.close();
-  }, 400);
+<body>${bodyHTML}</body>
+</html>`;
 }
 
-// ─── Report content (rendered hidden, then printed) ──────────────────────────
+function printViaIframe(html: string) {
+  // Remove any existing print iframe
+  const existing = document.getElementById("beatahead-print-iframe");
+  if (existing) existing.remove();
 
-function ReportContent({
-  id,
-  date,
-  workouts,
-  totalMinutes,
-  intenseCounts,
-}: {
-  id: string;
-  date: string;
-  workouts: WorkoutSession[];
-  totalMinutes: number;
-  intenseCounts: Record<WorkoutSession["intensity"], number>;
-}) {
+  const iframe = document.createElement("iframe");
+  iframe.id = "beatahead-print-iframe";
+  iframe.style.cssText = "position:fixed;top:0;left:0;width:0;height:0;border:none;opacity:0;";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+  if (!doc) return;
+
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  // Wait for images/fonts then print
+  iframe.onload = () => {
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      // Clean up after print dialog closes
+      setTimeout(() => iframe.remove(), 2000);
+    }, 250);
+  };
+}
+
+// ─── Build report HTML string ─────────────────────────────────────────────────
+
+function buildFitnessReportHTML(
+  date: string,
+  workouts: WorkoutSession[],
+  totalMinutes: number,
+  intenseCounts: Record<WorkoutSession["intensity"], number>
+): string {
   const generatedAt = new Date().toLocaleString("en-US", {
-    month: "short", day: "numeric", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
+    month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit",
   });
 
-  return (
-    <div
-      id={id}
-      style={{
-        fontFamily: "system-ui, sans-serif",
-        maxWidth: 720,
-        margin: "0 auto",
-        padding: 32,
-        color: "#1e2a3a",
-        background: "white",
-      }}
-    >
-      {/* Header */}
-      <div style={{ borderBottom: "2px solid #dc2626", paddingBottom: 16, marginBottom: 24 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#1e2a3a" }}>
-              BeatAhead Fitness Report
-            </h1>
-            <p style={{ margin: "4px 0 0", fontSize: 14, color: "#64748b" }}>
-              {formatDisplay(date)}
-            </p>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <p style={{ margin: 0, fontSize: 11, color: "#94a3b8" }}>Generated</p>
-            <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>{generatedAt}</p>
-          </div>
-        </div>
+  const workoutsHTML = workouts.length === 0
+    ? `<div class="empty"><p style="font-size:16px;font-weight:600">No workouts recorded for this date.</p></div>`
+    : `
+      <div class="stat-grid">
+        <div class="stat-box"><p class="stat-label">Total Sessions</p><p class="stat-value">${workouts.length}</p></div>
+        <div class="stat-box"><p class="stat-label">Total Minutes</p><p class="stat-value">${totalMinutes}</p></div>
+        <div class="stat-box"><p class="stat-label">Intensity Mix</p><p class="stat-value" style="font-size:13px;margin-top:6px">${[
+          intenseCounts.light > 0 ? `${intenseCounts.light} light` : "",
+          intenseCounts.moderate > 0 ? `${intenseCounts.moderate} moderate` : "",
+          intenseCounts.intense > 0 ? `${intenseCounts.intense} intense` : "",
+        ].filter(Boolean).join(", ") || "—"}</p></div>
       </div>
+      <h2>Workout Details</h2>
+      <table>
+        <thead><tr><th>#</th><th>Type</th><th>Duration</th><th>Intensity</th><th>Notes</th></tr></thead>
+        <tbody>
+          ${workouts.map((w, i) => `
+            <tr>
+              <td style="color:#94a3b8;font-weight:600">${i + 1}</td>
+              <td style="font-weight:600">${EXERCISE_TYPE_LABELS[w.type]}</td>
+              <td>${w.durationMinutes} min</td>
+              <td><span class="badge" style="background:${intensityColor(w.intensity)}">${w.intensity}</span></td>
+              <td style="color:#64748b;font-style:italic">${w.notes ?? "—"}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>`;
 
-      {workouts.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "48px 0", color: "#94a3b8" }}>
-          <p style={{ fontSize: 16, fontWeight: 600 }}>No workouts recorded for this date.</p>
-          <p style={{ fontSize: 13, marginTop: 8 }}>Try selecting a different day.</p>
-        </div>
-      ) : (
-        <>
-          {/* Summary stats */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 28 }}>
-            {[
-              { label: "Total Sessions", value: String(workouts.length) },
-              { label: "Total Minutes", value: String(totalMinutes) },
-              {
-                label: "Intensity Mix",
-                value: [
-                  intenseCounts.light > 0 ? `${intenseCounts.light} light` : "",
-                  intenseCounts.moderate > 0 ? `${intenseCounts.moderate} moderate` : "",
-                  intenseCounts.intense > 0 ? `${intenseCounts.intense} intense` : "",
-                ].filter(Boolean).join(", ") || "—",
-              },
-            ].map(({ label, value }) => (
-              <div
-                key={label}
-                style={{
-                  background: "#f8fafc",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 8,
-                  padding: "12px 16px",
-                }}
-              >
-                <p style={{ margin: 0, fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  {label}
-                </p>
-                <p style={{ margin: "4px 0 0", fontSize: 18, fontWeight: 800, color: "#1e2a3a" }}>
-                  {value}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          {/* Workout table */}
-          <h2 style={{ fontSize: 14, fontWeight: 700, color: "#1e2a3a", marginBottom: 10, marginTop: 0 }}>
-            Workout Details
-          </h2>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: "#f1f5f9" }}>
-                {["#", "Type", "Duration", "Intensity", "Notes"].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      padding: "8px 12px",
-                      textAlign: "left",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: "#64748b",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                      borderBottom: "1px solid #e2e8f0",
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {workouts.map((w, i) => (
-                <tr
-                  key={w.id}
-                  style={{ background: i % 2 === 0 ? "white" : "#f8fafc", borderBottom: "1px solid #f1f5f9" }}
-                >
-                  <td style={{ padding: "9px 12px", color: "#94a3b8", fontWeight: 600 }}>{i + 1}</td>
-                  <td style={{ padding: "9px 12px", fontWeight: 600 }}>{EXERCISE_TYPE_LABELS[w.type]}</td>
-                  <td style={{ padding: "9px 12px" }}>{w.durationMinutes} min</td>
-                  <td style={{ padding: "9px 12px" }}>
-                    <span style={{
-                      display: "inline-block",
-                      padding: "2px 8px",
-                      borderRadius: 99,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      textTransform: "capitalize",
-                      color: "white",
-                      background: intensityColor(w.intensity),
-                    }}>
-                      {w.intensity}
-                    </span>
-                  </td>
-                  <td style={{ padding: "9px 12px", color: "#64748b", fontStyle: "italic" }}>
-                    {w.notes || "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
-      )}
-
-      {/* Footer */}
-      <div style={{ marginTop: 36, paddingTop: 16, borderTop: "1px solid #e2e8f0", fontSize: 10, color: "#94a3b8", textAlign: "center" }}>
-        BeatAhead Wellness Platform — This report is for personal wellness tracking only and does not constitute medical advice.
+  const body = `
+    <div class="header">
+      <div>
+        <h1>BeatAhead Fitness Report</h1>
+        <p style="margin-top:4px;color:#64748b;font-size:14px">${formatDisplay(date)}</p>
+      </div>
+      <div class="header-right">
+        <p>Generated</p>
+        <p style="color:#64748b">${generatedAt}</p>
       </div>
     </div>
-  );
+    ${workoutsHTML}
+    <div class="footer">BeatAhead Wellness Platform — This report is for personal wellness tracking only and does not constitute medical advice.</div>`;
+
+  return buildPrintHTML("BeatAhead Fitness Report", body);
 }
 
 // ─── Main exported component ──────────────────────────────────────────────────
@@ -242,7 +180,7 @@ export function FitnessReport() {
   const [selectedDate, setSelectedDate] = useState<string>(todayISO);
   const [showPicker, setShowPicker] = useState(false);
 
-  const REPORT_ID = "fitness-report-printable";
+  const REPORT_ID = "fitness-report-printable"; // kept for legacy, unused now
 
   // Filter workouts for the selected date
   const dayWorkouts = workoutHistory.filter((w) => w.date === selectedDate);
@@ -259,17 +197,6 @@ export function FitnessReport() {
 
   return (
     <>
-      {/* ── Hidden printable content ─────────────────────────────────── */}
-      <div style={{ position: "absolute", left: -9999, top: -9999, width: 760 }} aria-hidden>
-        <ReportContent
-          id={REPORT_ID}
-          date={selectedDate}
-          workouts={dayWorkouts}
-          totalMinutes={totalMinutes}
-          intenseCounts={intenseCounts}
-        />
-      </div>
-
       {/* ── Visible card — bold hero design ─────────────────────────── */}
       <div className="rounded-2xl overflow-hidden border border-navy-200 shadow-lg">
 
@@ -287,7 +214,7 @@ export function FitnessReport() {
 
           {/* Big print button */}
           <Button
-            onClick={() => printReport(REPORT_ID)}
+            onClick={() => printViaIframe(buildFitnessReportHTML(selectedDate, dayWorkouts, totalMinutes, intenseCounts))}
             size="default"
             className="gap-2 bg-white text-navy-900 hover:bg-blue-50 font-bold shadow-lg shrink-0 px-5 py-2.5 text-sm"
           >
@@ -420,7 +347,7 @@ export function FitnessReport() {
 
           {/* Bottom CTA — repeat print button prominently */}
           <Button
-            onClick={() => printReport(REPORT_ID)}
+            onClick={() => printViaIframe(buildFitnessReportHTML(selectedDate, dayWorkouts, totalMinutes, intenseCounts))}
             size="default"
             className="w-full gap-2 font-bold text-sm py-3"
             disabled={dayWorkouts.length === 0}
