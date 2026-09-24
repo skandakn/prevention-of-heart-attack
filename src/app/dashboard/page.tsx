@@ -15,9 +15,10 @@ import { Heart, PhoneCall, FileText, CreditCard, BookOpen, Info } from "lucide-r
 
 export default function DashboardPage() {
   const { settings } = useSimulation();
+  
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3" data-tour-id="dashboard-header">
         <div>
           <h1 className="text-2xl font-bold text-navy-900">Dashboard</h1>
           <p className="text-sm text-navy-500 mt-0.5">Live Physiological Monitoring</p>
@@ -31,11 +32,13 @@ export default function DashboardPage() {
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <ISITrendChart />
+          <div data-tour-id="isi-trend-chart">
+            <ISITrendChart />
+          </div>
           <RiskTrendBanner />
         </div>
         <div className="space-y-6">
-          <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-card">
+          <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-card" data-tour-id="isi-gauge">
             <ISIGauge />
           </div>
           {settings.showRangeLabels && (
