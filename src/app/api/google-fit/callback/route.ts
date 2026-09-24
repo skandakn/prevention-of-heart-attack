@@ -71,14 +71,14 @@ export async function GET(request: Request) {
     return redirect(`${origin}/fitness?gfit_error=${encodeURIComponent(`Token exchange failed: ${err instanceof Error ? err.message : String(err)}`)}`);
   }
 
-  // ── Fetch last 30 days of sessions ────────────────────────────────────────
+  // Fetch all activity since Google Fit launched (Jan 1 2015) to capture full history
   const now = Date.now();
-  const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+  const allTimeStart = new Date("2015-01-01T00:00:00.000Z").getTime();
   let workouts: ReturnType<typeof mapGoogleFitSessions> = [];
 
   try {
     const sessionsRes = await fetch(
-      `${SESSIONS_URL}?startTime=${new Date(thirtyDaysAgo).toISOString()}&endTime=${new Date(now).toISOString()}`,
+      `${SESSIONS_URL}?startTime=${new Date(allTimeStart).toISOString()}&endTime=${new Date(now).toISOString()}`,
       { headers: { Authorization: `Bearer ${tokens.access_token}` } }
     );
 

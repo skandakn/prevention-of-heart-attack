@@ -113,7 +113,7 @@ export function GoogleFitSync() {
                   Workouts Imported
                 </p>
                 <p className="text-xl font-bold text-navy-900">{gfitWorkoutCount}</p>
-                <p className="text-[11px] text-navy-500 mt-0.5">last 30 days</p>
+                <p className="text-[11px] text-navy-500 mt-0.5">all time</p>
               </div>
               <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2.5">
                 <p className="text-[11px] font-medium text-navy-500 uppercase tracking-wide mb-1">

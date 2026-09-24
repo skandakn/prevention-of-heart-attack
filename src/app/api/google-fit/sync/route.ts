@@ -89,13 +89,13 @@ export async function POST(request: Request) {
     }
   }
 
-  // ── Fetch last 30 days of sessions ────────────────────────────────────────
+  // Fetch all activity since Google Fit launched (Jan 1 2015) to capture full history
   const now = Date.now();
-  const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+  const allTimeStart = new Date("2015-01-01T00:00:00.000Z").getTime();
 
   try {
     const sessionsRes = await fetch(
-      `${SESSIONS_URL}?startTime=${new Date(thirtyDaysAgo).toISOString()}&endTime=${new Date(now).toISOString()}`,
+      `${SESSIONS_URL}?startTime=${new Date(allTimeStart).toISOString()}&endTime=${new Date(now).toISOString()}`,
       {
         headers: { Authorization: `Bearer ${access_token}` },
       }
