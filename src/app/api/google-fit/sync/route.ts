@@ -89,13 +89,13 @@ export async function POST(request: Request) {
     }
   }
 
-  // ── Fetch last 30 days of sessions ────────────────────────────────────────
+  // ── Fetch last 365 days of sessions ────────────────────────────────────────
   const now = Date.now();
-  const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+  const oneYearAgo = now - 365 * 24 * 60 * 60 * 1000;
 
   try {
     const sessionsRes = await fetch(
-      `${SESSIONS_URL}?startTime=${new Date(thirtyDaysAgo).toISOString()}&endTime=${new Date(now).toISOString()}`,
+      `${SESSIONS_URL}?startTime=${new Date(oneYearAgo).toISOString()}&endTime=${new Date(now).toISOString()}`,
       {
         headers: { Authorization: `Bearer ${access_token}` },
       }

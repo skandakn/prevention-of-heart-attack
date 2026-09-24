@@ -82,8 +82,8 @@ export function mapGoogleFitSessions(sessions: GoogleFitSession[]): WorkoutSessi
     .filter((s) => {
       const start = Number(s.startTimeMillis);
       const end = Number(s.endTimeMillis);
-      // Must have valid timestamps and at least 5 minutes duration
-      return !isNaN(start) && !isNaN(end) && end - start >= 5 * 60 * 1000;
+      // Must have valid timestamps and at least 1 minute duration
+      return !isNaN(start) && !isNaN(end) && end - start >= 1 * 60 * 1000;
     })
     .map((s) => {
       const startMs = Number(s.startTimeMillis);
