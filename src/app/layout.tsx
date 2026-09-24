@@ -9,6 +9,8 @@ import { Sidebar, MobileNav, AppHeader } from "@/components/layout/Sidebar";
 import { Toast } from "@/components/layout/Toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CardiacVoiceWidget } from "@/components/voice/CardiacVoiceWidget";
+import { TourProvider } from "@/lib/tour/TourContext";
+import { GuidedTour } from "@/components/tour/GuidedTour";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -45,15 +47,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <SubscriptionProvider>
             <SimulationProvider>
               <TooltipProvider>
-                <DemoBanner />
-                <Sidebar />
-                <div className="lg:pl-64">
-                  <AppHeader />
-                  <main className="min-h-screen pb-20 lg:pb-0">{children}</main>
-                </div>
-                <MobileNav />
-                <Toast />
-                <CardiacVoiceWidget />
+                <TourProvider>
+                  <GuidedTour />
+                  <DemoBanner />
+                  <Sidebar />
+                  <div className="lg:pl-64">
+                    <AppHeader />
+                    <main className="min-h-screen pb-20 lg:pb-0">{children}</main>
+                  </div>
+                  <MobileNav />
+                  <Toast />
+                  <CardiacVoiceWidget />
+                </TourProvider>
               </TooltipProvider>
             </SimulationProvider>
           </SubscriptionProvider>

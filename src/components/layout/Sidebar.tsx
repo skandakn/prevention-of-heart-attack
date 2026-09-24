@@ -23,9 +23,11 @@ import {
   PhoneCall,
   FileText,
   LogIn,
+  Compass,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSubscription } from "@/lib/subscription/SubscriptionContext";
+import { useTour } from "@/lib/tour/TourContext";
 import { useState } from "react";
 import { DemoModePanel } from "./DemoModePanel";
 import { SystemStatusPanel } from "./SystemStatusPanel";
@@ -34,8 +36,6 @@ import { Button } from "@/components/ui/button";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/helpline", label: "Cardiac Helpline", icon: PhoneCall },
-  { href: "/calls", label: "Call Records", icon: FileText },
   { href: "/monitor", label: "Live Monitor", icon: Radio },
   { href: "/signals", label: "Signals", icon: Activity },
   { href: "/trends", label: "Trends", icon: BarChart3 },
@@ -44,24 +44,15 @@ const navItems = [
   { href: "/fitness", label: "Fitness Agent", icon: Dumbbell },
   { href: "/rest", label: "Rest Agent", icon: Moon },
   { href: "/clinician", label: "Clinician View", icon: Stethoscope },
-  { href: "/pricing", label: "Pricing", icon: CreditCard },
-  { href: "/methodology", label: "Methodology", icon: BookOpen },
-  { href: "/about", label: "About", icon: Info },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { startTour } = useTour();
   const isLanding = pathname === "/";
   const isAuthPage = pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up");
 
   if (isLanding || isAuthPage) return null;
-
-  // Hide these items on dashboard page (they're in the footer)
-  const hiddenOnDashboard = ["/helpline", "/calls", "/pricing", "/methodology", "/about"];
-  const isDashboard = pathname === "/dashboard";
-  const visibleNavItems = isDashboard
-    ? navItems.filter((item) => !hiddenOnDashboard.includes(item.href))
-    : navItems;
 
   return (
     <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 lg:z-40 border-r border-navy-100 bg-white">
@@ -76,13 +67,24 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {visibleNavItems.map((item) => {
+        {navItems.map((item, index) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
-          return (
+          
+          // Add tour IDs for specific nav items
+          let tourId: string | undefined;
+          if (item.href === "/monitor") tourId = "nav-monitor";
+          if (item.href === "/signals") tourId = "nav-signals";
+          
+          // Check if we need to start wellness agents wrapper
+          const isFirstWellnessAgent = item.href === "/nutri-agent";
+          const isLastWellnessAgent = item.href === "/rest";
+          
+          const linkElement = (
             <Link
               key={item.href}
               href={item.href}
+              data-tour-id={tourId}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 isActive
@@ -94,6 +96,58 @@ export function Sidebar() {
               {item.label}
             </Link>
           );
+          
+          // Add guided tour launcher after Overview item
+          if (item.href === "/dashboard") {
+            return (
+              <div key={`${item.href}-with-tour`}>
+                {linkElement}
+                <button
+                  type="button"
+                  onClick={startTour}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-cardiac hover:bg-red-50 w-full"
+                >
+                  <Compass className="w-4 h-4" />
+                  Start Guided Tour
+                </button>
+              </div>
+            );
+          }
+          
+          // Wrap wellness agents
+          if (isFirstWellnessAgent) {
+            const wellnessAgents = navItems.slice(index, index + 3);
+            return (
+              <div key="wellness-agents-group" data-tour-id="wellness-agents">
+                {wellnessAgents.map((wellnessItem) => {
+                  const WellnessIcon = wellnessItem.icon;
+                  const wellnessActive = pathname === wellnessItem.href;
+                  return (
+                    <Link
+                      key={wellnessItem.href}
+                      href={wellnessItem.href}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                        wellnessActive
+                          ? "bg-navy-900 text-white"
+                          : "text-navy-600 hover:bg-navy-50 hover:text-navy-900"
+                      )}
+                    >
+                      <WellnessIcon className="w-4 h-4" />
+                      {wellnessItem.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            );
+          }
+          
+          // Skip the next two wellness agents since we already rendered them
+          if (item.href === "/fitness" || item.href === "/rest") {
+            return null;
+          }
+          
+          return linkElement;
         })}
       </nav>
 
