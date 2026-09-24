@@ -56,16 +56,9 @@ function formatLastSynced(ts: number | null): string {
   return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function openOAuthPopup() {
-  const width = 520;
-  const height = 640;
-  const left = Math.max(0, (window.screen.width - width) / 2);
-  const top = Math.max(0, (window.screen.height - height) / 2);
-  window.open(
-    "/api/google-fit/auth",
-    "gfit-oauth",
-    `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
-  );
+function connectGoogleFit() {
+  // Navigate in the same tab — Google will redirect back to /fitness?gfit_data=...
+  window.location.href = "/api/google-fit/auth";
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -203,7 +196,7 @@ export function GoogleFitSync() {
             <Button
               size="sm"
               variant="outline"
-              onClick={openOAuthPopup}
+              onClick={connectGoogleFit}
               className="gap-2 border-navy-300 hover:border-navy-500 w-full sm:w-auto"
             >
               <GoogleIcon className="h-4 w-4" />

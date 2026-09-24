@@ -171,6 +171,60 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
         const ts = Number(lastSynced);
         if (!isNaN(ts)) setGoogleFitLastSynced(ts);
       }
+
+      // ── Handle OAuth redirect: ?gfit_data=<base64> ───────────────────────
+      // The callback route encodes token + workouts as a base64 URL param.
+      // We decode it here, write everything to localStorage, and update state —
+      // then clean the URL so refreshing doesn't re-apply stale data.
+      const urlParams = new URLSearchParams(window.location.search);
+      const gfitData = urlParams.get("gfit_data");
+      const gfitError = urlParams.get("gfit_error");
+
+      if (gfitError) {
+        setGoogleFitError(decodeURIComponent(gfitError));
+        // Clean URL
+        const clean = window.location.pathname;
+        window.history.replaceState({}, "", clean);
+      } else if (gfitData) {
+        try {
+          // atob works in all modern browsers; base64url → base64
+          const json = atob(gfitData.replace(/-/g, "+").replace(/_/g, "/"));
+          const parsed = JSON.parse(json) as {
+            token: GoogleFitToken;
+            workouts: WorkoutSession[];
+            synced_at: number;
+          };
+
+          // Persist token
+          localStorage.setItem(GFIT_TOKEN_KEY, JSON.stringify(parsed.token));
+          setGoogleFitToken(parsed.token);
+
+          // Persist last-synced
+          localStorage.setItem(GFIT_SYNCED_KEY, String(parsed.synced_at));
+          setGoogleFitLastSynced(parsed.synced_at);
+
+          // Merge workouts — replace any existing gfit_ entries
+          if (parsed.workouts.length > 0) {
+            const existingRaw = localStorage.getItem(STORAGE_KEYS.WORKOUT_HISTORY);
+            const existing: WorkoutSession[] = existingRaw ? JSON.parse(existingRaw) : [];
+            const nonGfit = existing.filter((w) => !w.id.startsWith("gfit_"));
+            const merged = [...parsed.workouts, ...nonGfit].sort(
+              (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+            );
+            localStorage.setItem(STORAGE_KEYS.WORKOUT_HISTORY, JSON.stringify(merged));
+            setWorkoutHistory(merged);
+          }
+
+          setGoogleFitError(null);
+        } catch (e) {
+          console.error("[FitRestContext] Failed to parse gfit_data:", e);
+          setGoogleFitError("Failed to apply Google Fit data. Please try connecting again.");
+        }
+
+        // Clean URL regardless of success/failure
+        const clean = window.location.pathname;
+        window.history.replaceState({}, "", clean);
+      }
     } catch (err) {
       console.error("[FitRestContext] Error loading from localStorage:", err);
       // Silently fail and use defaults
@@ -368,40 +422,6 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
       setWorkoutHistory(demoWorkouts);
       localStorage.setItem(STORAGE_KEYS.WORKOUT_HISTORY, JSON.stringify(demoWorkouts));
     } catch {/* ignore */}
-  }, []);
-
-  // ── Google Fit: listen for popup auth success ─────────────────────────────
-
-  useEffect(() => {
-    function handleMessage(event: MessageEvent) {
-      if (event.origin !== window.location.origin) return;
-      if (!event.data || event.data.type !== "GFIT_AUTH_SUCCESS") return;
-
-      // The callback page already wrote token + workouts to localStorage.
-      // Re-read them into state so the UI updates without a full refresh.
-      try {
-        const storedToken = localStorage.getItem(GFIT_TOKEN_KEY);
-        if (storedToken) {
-          setGoogleFitToken(JSON.parse(storedToken) as GoogleFitToken);
-        }
-
-        const storedWorkouts = localStorage.getItem(STORAGE_KEYS.WORKOUT_HISTORY);
-        if (storedWorkouts) {
-          const parsed = JSON.parse(storedWorkouts) as WorkoutSession[];
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setWorkoutHistory(parsed);
-          }
-        }
-
-        const ts = Number(localStorage.getItem(GFIT_SYNCED_KEY));
-        if (!isNaN(ts) && ts > 0) setGoogleFitLastSynced(ts);
-
-        setGoogleFitError(null);
-      } catch {/* ignore */}
-    }
-
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
   }, []);
 
   // ── Derived: is Google Fit currently connected ────────────────────────────
