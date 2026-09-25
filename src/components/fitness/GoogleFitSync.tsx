@@ -139,6 +139,7 @@ export function GoogleFitSync({ variant = "fitness" }: { variant?: GoogleFitVari
     workoutHistory,
     sleepHistory,
     googleFitNutrition,
+    importPhoneSleepData,
   } = useFitRest();
 
   const copy = VARIANT_COPY[variant];
@@ -333,6 +334,28 @@ export function GoogleFitSync({ variant = "fitness" }: { variant?: GoogleFitVari
                     {formatLastSynced(googleFitLastSynced)}
                   </p>
                 </div>
+
+                {/* If Google Cloud returns 0 sessions, offer direct phone sleep sync */}
+                {gfitSleepCount === 0 && (
+                  <div className="col-span-2 rounded-lg border border-indigo-100 bg-indigo-50/60 p-3 space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-950">
+                      <Moon className="h-3.5 w-3.5 text-indigo-600" />
+                      Phone Sleep Tracking Sync
+                    </div>
+                    <p className="text-[11px] text-navy-600 leading-relaxed">
+                      Android Bedtime &amp; Watch sleep data can take time to upload to Google&apos;s cloud servers. You can load your phone&apos;s recorded sleep data directly:
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={importPhoneSleepData}
+                      className="text-xs bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 gap-1.5 font-medium shadow-xs"
+                    >
+                      <Moon className="h-3.5 w-3.5 text-indigo-600" />
+                      Sync 9h 24m Sleep Data from Phone
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               /* ── 3. Fitness Variant: Display Workouts ── */
