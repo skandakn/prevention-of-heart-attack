@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useNutri } from "@/lib/nutri/NutriContext";
+import { useFitRest } from "@/lib/fit-rest/FitRestContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { Lightbulb, HelpCircle, RefreshCw, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
+import { Lightbulb, HelpCircle, RefreshCw, AlertTriangle, ChevronDown, ChevronUp, Utensils } from "lucide-react";
 import type { NutriISIContext } from "@/lib/nutri/types";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -20,7 +21,8 @@ interface SmartRecommendationsProps {
 async function fetchNutriResponse(
   intent: "recommendations" | "explain",
   isiContext: NutriISIContext | null,
-  profile: object
+  profile: object,
+  googleFitNutrition?: any
 ): Promise<string> {
   const promptMap = {
     recommendations:
@@ -28,6 +30,14 @@ async function fetchNutriResponse(
     explain:
       "Why am I seeing these nutrition recommendations? Please explain the reasoning.",
   } as const;
+
+  let gfitPayload = googleFitNutrition;
+  if (!gfitPayload) {
+    try {
+      const raw = localStorage.getItem("beatahead-gfit-nutrition");
+      if (raw) gfitPayload = JSON.parse(raw);
+    } catch {}
+  }
 
   const res = await fetch("/api/nutri-agent/chat", {
     method: "POST",
@@ -37,6 +47,7 @@ async function fetchNutriResponse(
       isiContext,
       userProfile: profile,
       intent,
+      googleFitNutrition: gfitPayload,
     }),
   });
 
@@ -53,6 +64,7 @@ async function fetchNutriResponse(
 
 export function SmartRecommendations({ isiContext }: SmartRecommendationsProps) {
   const { profile } = useNutri();
+  const { googleFitNutrition } = useFitRest();
 
   const [recommendations, setRecommendations] = useState<string | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
@@ -68,7 +80,7 @@ export function SmartRecommendations({ isiContext }: SmartRecommendationsProps) 
     setRecsError(null);
     setRecsLoading(true);
     try {
-      const result = await fetchNutriResponse("recommendations", isiContext, profile);
+      const result = await fetchNutriResponse("recommendations", isiContext, profile, googleFitNutrition);
       setRecommendations(result);
     } catch (err: unknown) {
       setRecsError(err instanceof Error ? err.message : "An error occurred.");
@@ -84,7 +96,7 @@ export function SmartRecommendations({ isiContext }: SmartRecommendationsProps) 
     setExplainLoading(true);
     setExplainOpen(true);
     try {
-      const result = await fetchNutriResponse("explain", isiContext, profile);
+      const result = await fetchNutriResponse("explain", isiContext, profile, googleFitNutrition);
       setExplanation(result);
     } catch (err: unknown) {
       setExplainError(err instanceof Error ? err.message : "An error occurred.");
@@ -109,6 +121,21 @@ export function SmartRecommendations({ isiContext }: SmartRecommendationsProps) 
         </CardHeader>
 
         <CardContent className="space-y-4">
+          {/* Google Fit Context Banner */}
+          {googleFitNutrition && googleFitNutrition.today.calories > 0 && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <Utensils className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span className="font-semibold text-navy-900">
+                  Google Fit Tracked: {Math.round(googleFitNutrition.today.calories)} kcal · {Math.round(googleFitNutrition.today.protein)}g Protein · {googleFitNutrition.totalMealsCount} meals
+                </span>
+              </div>
+              <span className="text-[11px] text-emerald-800 font-medium bg-emerald-100/70 border border-emerald-200 rounded-md px-2 py-0.5">
+                Recommendations factor in your actual intake
+              </span>
+            </div>
+          )}
+
           <Button
             onClick={generateRecommendations}
             disabled={recsLoading}

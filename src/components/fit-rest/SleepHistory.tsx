@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useFitRest } from "@/lib/fit-rest/FitRestContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -8,12 +8,26 @@ import { cn } from "@/lib/utils";
 // ─── Helper Functions ─────────────────────────────────────────────────────────
 
 function formatTime(dateString: string): string {
-  const date = new Date(dateString);
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  const period = hours >= 12 ? 'PM' : 'AM';
-  const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
-  return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+  if (!dateString) return "--:--";
+  if (dateString.includes("T")) {
+    const date = new Date(dateString);
+    if (!isNaN(date.getTime())) {
+      const hours = date.getHours();
+      const minutes = date.getMinutes();
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
+      return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+    }
+  }
+  if (dateString.includes(":")) {
+    const [h, m] = dateString.split(":").map(Number);
+    if (!isNaN(h) && !isNaN(m)) {
+      const period = h >= 12 ? 'PM' : 'AM';
+      const displayHours = h > 12 ? h - 12 : h === 0 ? 12 : h;
+      return `${displayHours}:${m.toString().padStart(2, '0')} ${period}`;
+    }
+  }
+  return dateString;
 }
 
 function formatDate(dateString: string): string {

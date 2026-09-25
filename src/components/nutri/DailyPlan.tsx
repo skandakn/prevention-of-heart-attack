@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNutri } from "@/lib/nutri/NutriContext";
+import { useFitRest } from "@/lib/fit-rest/FitRestContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarDays, RefreshCw, AlertTriangle } from "lucide-react";
+import { CalendarDays, RefreshCw, AlertTriangle, Utensils } from "lucide-react";
 import type { NutriISIContext } from "@/lib/nutri/types";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -18,17 +19,35 @@ interface DailyPlanProps {
 
 export function DailyPlan({ isiContext }: DailyPlanProps) {
   const { sendMessage, isLoading, error, profile } = useNutri();
+  const { googleFitNutrition } = useFitRest();
   const [plan, setPlan] = useState<string | null>(null);
   const [localLoading, setLocalLoading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
+  // Restore cached plan on mount so user doesn't wait every time
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem("beatahead-daily-plan");
+      if (cached) {
+        setPlan((prev) => prev ?? cached);
+      }
+    } catch {}
+  }, []);
+
   async function generatePlan() {
     if (localLoading || isLoading) return;
-    setPlan(null);
     setLocalError(null);
     setLocalLoading(true);
 
     try {
+      let gfitNutritionPayload = googleFitNutrition;
+      if (!gfitNutritionPayload) {
+        try {
+          const raw = localStorage.getItem("beatahead-gfit-nutrition");
+          if (raw) gfitNutritionPayload = JSON.parse(raw);
+        } catch {}
+      }
+
       const res = await fetch("/api/nutri-agent/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -42,7 +61,9 @@ export function DailyPlan({ isiContext }: DailyPlanProps) {
           isiContext: isiContext,
           userProfile: profile,
           intent: "daily_plan",
+          googleFitNutrition: gfitNutritionPayload,
         }),
+        signal: AbortSignal.timeout(10000),
       });
 
       if (!res.ok) {
@@ -51,7 +72,11 @@ export function DailyPlan({ isiContext }: DailyPlanProps) {
       }
 
       const data = await res.json();
-      setPlan(data.responseText || "No plan received.");
+      const outputPlan = data.responseText || "No plan received.";
+      setPlan(outputPlan);
+      try {
+        localStorage.setItem("beatahead-daily-plan", outputPlan);
+      } catch {}
     } catch (err: unknown) {
       setLocalError(
         err instanceof Error ? err.message : "An error occurred. Please try again."
@@ -77,6 +102,39 @@ export function DailyPlan({ isiContext }: DailyPlanProps) {
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {/* Google Fit Nutrition Context Banner */}
+        {googleFitNutrition && googleFitNutrition.today.calories > 0 && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3.5 space-y-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-bold text-navy-900">
+                  Calibrated to Live Google Fit Intake:
+                </span>
+                <span className="text-xs font-semibold text-emerald-800">
+                  {Math.round(googleFitNutrition.today.calories)} kcal
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-navy-600 font-medium">
+                <span>{Math.round(googleFitNutrition.today.protein)}g Protein</span>
+                <span>·</span>
+                <span>{Math.round(googleFitNutrition.today.carbs)}g Carbs</span>
+                <span>·</span>
+                <span>{Math.round(googleFitNutrition.today.fat)}g Fat</span>
+                {googleFitNutrition.today.fiber !== undefined && googleFitNutrition.today.fiber > 0 && (
+                  <>
+                    <span>·</span>
+                    <span className="text-emerald-700 font-semibold">{googleFitNutrition.today.fiber}g Fiber</span>
+                  </>
+                )}
+              </div>
+            </div>
+            <p className="text-[11px] text-navy-500 leading-relaxed">
+              The AI will tailor daily meal portions and macronutrient balance to match your tracked Google Fit intake ({googleFitNutrition.totalMealsCount} meal{googleFitNutrition.totalMealsCount !== 1 ? "s" : ""} logged).
+            </p>
+          </div>
+        )}
+
         {/* Generate / Regenerate button */}
         <Button
           onClick={generatePlan}

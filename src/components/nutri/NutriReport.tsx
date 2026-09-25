@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useNutri } from "@/lib/nutri/NutriContext";
+import { useFitRest } from "@/lib/fit-rest/FitRestContext";
 import { useSimulation } from "@/lib/simulation/SimulationContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { NutriMessage, NutriProfile } from "@/lib/nutri/types";
+import type { GoogleFitNutritionData } from "@/lib/fit-rest/types";
 import { FileText, Printer, RefreshCw, AlertTriangle } from "lucide-react";
 
 // ─── Label maps ───────────────────────────────────────────────────────────────
@@ -116,6 +118,7 @@ interface NutriReportData {
   messages: NutriMessage[];
   dailyPlan: string | null;
   recommendations: string | null;
+  nutrition: GoogleFitNutritionData | null;
   isi: { score: number; label: string; trend: string; hrv: number; heartRate: number; spo2: number; signalQuality: number; };
 }
 
@@ -167,6 +170,33 @@ function buildNutriReport(d: NutriReportData): string {
         <div class="info-row"><span class="info-key">Allergens / restrictions</span><span class="info-val">${d.profile.allergens || "None"}</span></div>
       </div></div>`;
 
+  // ── Google Fit Live Nutrition
+  const nutritionHTML = d.nutrition && (d.nutrition.today.calories > 0 || d.nutrition.totalMealsCount > 0)
+    ? `<div class="section-box"><div class="section-box-header">Google Fit Tracked Dietary Data</div><div class="section-box-body">
+        <div class="grid4">
+          <div class="stat"><p class="stat-label">Calories</p><p class="stat-value">${Math.round(d.nutrition.today.calories)}<span class="stat-unit"> kcal</span></p></div>
+          <div class="stat"><p class="stat-label">Protein</p><p class="stat-value">${Math.round(d.nutrition.today.protein)}<span class="stat-unit"> g</span></p></div>
+          <div class="stat"><p class="stat-label">Carbohydrates</p><p class="stat-value">${Math.round(d.nutrition.today.carbs)}<span class="stat-unit"> g</span></p></div>
+          <div class="stat"><p class="stat-label">Total Fats</p><p class="stat-value">${Math.round(d.nutrition.today.fat)}<span class="stat-unit"> g</span></p></div>
+        </div>
+        <div class="grid2" style="margin-top:8px">
+          <div class="stat"><p class="stat-label">Dietary Fiber</p><p class="stat-value">${d.nutrition.today.fiber ?? 0}<span class="stat-unit"> g</span></p></div>
+          <div class="stat"><p class="stat-label">Sodium</p><p class="stat-value">${d.nutrition.today.sodium ?? 0}<span class="stat-unit"> mg</span></p></div>
+        </div>
+        ${d.nutrition.meals && d.nutrition.meals.length > 0 ? `
+          <div style="margin-top:10px;border-top:1px solid #e2e8f0;padding-top:8px">
+            <p style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px">Tracked Meals (${d.nutrition.meals.length})</p>
+            ${d.nutrition.meals.map(m => `
+              <div class="info-row">
+                <span class="info-key"><strong style="text-transform:capitalize">${m.mealType}:</strong> ${m.name}</span>
+                <span class="info-val">${Math.round(m.nutrients.calories)} kcal · ${Math.round(m.nutrients.protein)}g P · ${Math.round(m.nutrients.carbs)}g C · ${Math.round(m.nutrients.fat)}g F</span>
+              </div>
+            `).join("")}
+          </div>
+        ` : ""}
+      </div></div>`
+    : `<p class="empty">No Google Fit nutrition data recorded.</p>`;
+
   // ── Daily plan
   const planHTML = !d.dailyPlan
     ? `<p class="empty">No daily plan generated yet. Go to the Daily Plan tab and generate one before printing.</p>`
@@ -195,6 +225,7 @@ function buildNutriReport(d: NutriReportData): string {
     </div>
     ${wellnessHTML}
     <h2>Nutrition Profile</h2>${profileHTML}
+    <h2>Google Fit Tracked Dietary Intake</h2>${nutritionHTML}
     <h2>Daily Nutrition Plan</h2>${planHTML}
     <h2>Wellness Recommendations</h2>${recsHTML}
     <h2>Today's Chat (${todayMsgs.length} message${todayMsgs.length !== 1 ? "s" : ""})</h2>${msgsHTML}
@@ -208,6 +239,7 @@ function buildNutriReport(d: NutriReportData): string {
 
 export function NutriReport() {
   const { profile, messages } = useNutri();
+  const { googleFitNutrition } = useFitRest();
   const { currentSample, currentScore } = useSimulation();
 
   const [dailyPlan, setDailyPlan] = useState<string | null>(null);
@@ -240,6 +272,7 @@ export function NutriReport() {
         },
         userProfile: profile,
         intent,
+        googleFitNutrition,
       }),
     });
     if (!res.ok) {
@@ -282,6 +315,7 @@ export function NutriReport() {
       messages,
       dailyPlan,
       recommendations,
+      nutrition: googleFitNutrition,
       isi: {
         score: currentScore.score,
         label: currentScore.label,
@@ -370,6 +404,9 @@ export function NutriReport() {
               `HR ${Math.round(currentSample.heartRate)} bpm · HRV ${Math.round(currentSample.hrv)} ms`,
               `SpO₂ ${currentSample.spo2.toFixed(1)}%`,
               `Profile: ${profile.isProfileComplete ? "Complete" : "Incomplete"}`,
+              ...(googleFitNutrition && googleFitNutrition.today.calories > 0
+                ? [`Google Fit: ${Math.round(googleFitNutrition.today.calories)} kcal · ${Math.round(googleFitNutrition.today.protein)}g P`]
+                : []),
               `Daily plan: ${dailyPlan ? "✓ Ready" : "Not generated"}`,
               `Recommendations: ${recommendations ? "✓ Ready" : "Not generated"}`,
               `Chat today: ${todayMsgs.length} message${todayMsgs.length !== 1 ? "s" : ""}`,

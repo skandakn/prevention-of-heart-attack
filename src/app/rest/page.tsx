@@ -8,8 +8,9 @@ import { WindDownRoutine } from "@/components/fit-rest/WindDownRoutine";
 import { SleepHistory } from "@/components/fit-rest/SleepHistory";
 import { RestAIChat } from "@/components/rest/RestAIChat";
 import { RestReport } from "@/components/rest/RestReport";
+import { GoogleFitSync } from "@/components/fitness/GoogleFitSync";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Moon, FileText } from "lucide-react";
+import { Moon, FileText, Activity } from "lucide-react";
 
 // ─── Inner page component (inside FitRestProvider) ────────────────────────────
 
@@ -28,6 +29,15 @@ function RestPageInner() {
         <p className="text-sm text-navy-500">
           Personalized sleep and recovery guidance based on your wellness patterns.
         </p>
+      </div>
+
+      {/* ── Connect Google Fit ──────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Activity className="h-5 w-5 text-navy-600" />
+          <h2 className="text-lg font-semibold text-navy-900">Connect Google Fit</h2>
+        </div>
+        <GoogleFitSync variant="rest" />
       </div>
 
       {/* ── Tabs ──────────────────────────────────────────────────────── */}

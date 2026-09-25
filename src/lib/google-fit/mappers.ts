@@ -7,7 +7,16 @@
  * Reference: https://developers.google.com/fit/rest/v1/reference/users/sessions
  */
 
-import type { WorkoutSession, ExerciseType, WorkoutIntensity } from "@/lib/fit-rest/types";
+import type {
+  WorkoutSession,
+  ExerciseType,
+  WorkoutIntensity,
+  SleepSession,
+  SleepQuality,
+  GoogleFitNutrientBreakdown,
+  GoogleFitMealLog,
+  GoogleFitNutritionData,
+} from "@/lib/fit-rest/types";
 
 // ─── Google Fit activity-type IDs → BeatAhead ExerciseType ───────────────────
 // Source: https://developers.google.com/fit/rest/v1/reference/activity-types
@@ -354,6 +363,8 @@ export async function fetchAndMapSteps(
     ? [{ dataTypeName: stepDataType, dataSourceId: stepSourceId }]
     : [{ dataTypeName: "com.google.step_count.delta" }];
 
+  const stepStart = Math.max(startMs, endMs - 60 * 86400000);
+
   let aggRes = await fetch(
     "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate",
     {
@@ -362,9 +373,10 @@ export async function fetchAndMapSteps(
       body: JSON.stringify({
         aggregateBy,
         bucketByTime: { durationMillis: "86400000" },
-        startTimeMillis: String(startMs),
+        startTimeMillis: String(stepStart),
         endTimeMillis: String(endMs),
       }),
+      signal: AbortSignal.timeout(4000),
     }
   );
 
@@ -378,9 +390,10 @@ export async function fetchAndMapSteps(
         body: JSON.stringify({
           aggregateBy: [{ dataTypeName: "com.google.step_count.delta" }],
           bucketByTime: { durationMillis: "86400000" },
-          startTimeMillis: String(startMs),
+          startTimeMillis: String(stepStart),
           endTimeMillis: String(endMs),
         }),
+        signal: AbortSignal.timeout(4000),
       }
     );
   }
@@ -416,3 +429,532 @@ export async function fetchAndMapSteps(
 
   return sessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
+
+// ─── Sleep session fetching & mapping ────────────────────────────────────────
+
+/**
+ * Google Fit activity type 72 = "Sleep".
+ * The sessions API returns sleep sessions with startTimeMillis / endTimeMillis.
+ * We compute duration, derive a quality score from duration, and map to SleepSession.
+ *
+ * Reference:
+ *   https://developers.google.com/fit/rest/v1/reference/activity-types (type 72)
+ */
+
+function durationToSleepQuality(durationHours: number): SleepQuality {
+  if (durationHours >= 7.5) return "excellent";
+  if (durationHours >= 6.5) return "good";
+  if (durationHours >= 5)   return "fair";
+  return "poor";
+}
+
+export async function fetchAndMapSleep(
+  accessToken: string,
+  startMs: number,
+  endMs: number
+): Promise<SleepSession[]> {
+  const SLEEP_ACTIVITY_TYPE = 72;
+  const sessions: SleepSession[] = [];
+  const datesWithSleep = new Set<string>();
+
+  // 1. Fetch tracked sessions (apps that log Sessions with activityType 72 or name containing sleep/bedtime)
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/fitness/v1/users/me/sessions?startTime=${new Date(startMs).toISOString()}&endTime=${new Date(endMs).toISOString()}`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(3000),
+      }
+    );
+
+    if (res.ok) {
+      const data = (await res.json()) as { session?: GoogleFitSession[] };
+      const raw = (data.session ?? []).filter(
+        (s) => s.activityType === SLEEP_ACTIVITY_TYPE || s.name?.toLowerCase().includes("sleep") || s.name?.toLowerCase().includes("bedtime")
+      );
+
+      for (const s of raw) {
+        const startTimeMs = Number(s.startTimeMillis);
+        const endTimeMs = Number(s.endTimeMillis);
+        if (isNaN(startTimeMs) || isNaN(endTimeMs) || endTimeMs - startTimeMs < 30 * 60 * 1000) continue;
+
+        const durationMs = endTimeMs - startTimeMs;
+        const hoursSlept = Math.round((durationMs / 1000 / 3600) * 10) / 10;
+        const dateStr = new Date(startTimeMs).toISOString().split("T")[0];
+
+        datesWithSleep.add(dateStr);
+        sessions.push({
+          id: `gfit_sleep_${s.id}`,
+          date: dateStr,
+          bedtime: new Date(startTimeMs).toISOString(),
+          wakeTime: new Date(endTimeMs).toISOString(),
+          hoursSlept,
+          quality: durationToSleepQuality(hoursSlept),
+          notes: `Imported from Google Fit${s.name ? `: ${s.name}` : ""}`,
+          isDemoData: false,
+        });
+      }
+    }
+  } catch (err) {
+    console.error("[GFit Sleep] Sessions fetch error:", err);
+  }
+
+  // 2. Discover sleep data sources (com.google.sleep.segment) & read raw datasets
+  try {
+    let sleepSources: string[] = [
+      "derived:com.google.sleep.segment:com.google.android.gms:merged",
+      "derived:com.google.activity.segment:com.google.android.gms:merge_activity_segments",
+    ];
+    try {
+      const dsRes = await fetch("https://www.googleapis.com/fitness/v1/users/me/dataSources", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(3000),
+      });
+      if (dsRes.ok) {
+        const dsData = (await dsRes.json()) as {
+          dataSource?: { dataStreamId: string; dataType?: { name: string } }[];
+        };
+        const discovered = (dsData.dataSource ?? [])
+          .filter(
+            (s) =>
+              s.dataType?.name === "com.google.sleep.segment" ||
+              s.dataType?.name === "com.google.activity.segment" ||
+              s.dataStreamId.toLowerCase().includes("sleep") ||
+              s.dataStreamId.toLowerCase().includes("bedtime") ||
+              s.dataStreamId.toLowerCase().includes("deskclock")
+          )
+          .map((s) => s.dataStreamId);
+        
+        sleepSources = Array.from(new Set([...sleepSources, ...discovered]));
+      }
+      console.log(`[GFit Sleep] Discovered ${sleepSources.length} sleep sources:`, sleepSources);
+    } catch (e) {
+      console.error("[GFit Sleep] DataSources discovery error:", e);
+    }
+
+    const rawPoints: Array<{ startMs: number; endMs: number; stage: number }> = [];
+
+    // Query in 30-day chunks; select top 2 merged/session sources to keep sync under 2 seconds
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+    const windows = [
+      { start: endMs - THIRTY_DAYS, end: endMs },
+    ];
+
+    const preferred = sleepSources.filter((s) => s.includes("merged") || s.includes("session"));
+    const sourcesToQuery = (preferred.length > 0 ? preferred : sleepSources).slice(0, 2);
+
+    for (const sourceId of sourcesToQuery) {
+      for (const win of windows) {
+        try {
+          const datasetId = `${win.start}000000-${win.end}000000`;
+          const rawRes = await fetch(
+            `https://www.googleapis.com/fitness/v1/users/me/dataSources/${encodeURIComponent(sourceId)}/datasets/${datasetId}`,
+            {
+              headers: { Authorization: `Bearer ${accessToken}` },
+              signal: AbortSignal.timeout(3000),
+            }
+          );
+
+          if (rawRes.ok) {
+            const rawData = (await rawRes.json()) as {
+              point?: {
+                startTimeNanos?: string;
+                endTimeNanos?: string;
+                value?: Array<{ intVal?: number }>;
+              }[];
+            };
+
+            for (const point of rawData.point ?? []) {
+              if (!point.startTimeNanos || !point.endTimeNanos) continue;
+              const pStart = Number(BigInt(point.startTimeNanos) / BigInt(1_000_000));
+              const pEnd = Number(BigInt(point.endTimeNanos) / BigInt(1_000_000));
+              const stage = point.value?.[0]?.intVal ?? 2;
+
+              // If activity segment, 72 is sleep; if sleep segment, 1 is awake and 3 is out-of-bed
+              const isSleep = sourceId.includes("activity")
+                ? stage === 72
+                : (stage !== 1 && stage !== 3);
+
+              if (isSleep && pEnd > pStart) {
+                rawPoints.push({ startMs: pStart, endMs: pEnd, stage });
+              }
+            }
+          }
+        } catch (e) {
+          console.error(`[GFit Sleep] Raw dataset fetch error for ${sourceId}:`, e);
+        }
+      }
+    }
+
+    // Sort all raw sleep points chronologically
+    rawPoints.sort((a, b) => a.startMs - b.startMs);
+
+    // Cluster points into nightly sleep sessions (gap between segments <= 3 hours)
+    interface SleepCluster {
+      startMs: number;
+      endMs: number;
+      sleepDurationMs: number;
+    }
+    const clusters: SleepCluster[] = [];
+
+    for (const pt of rawPoints) {
+      const isAwake = pt.stage === 1 || pt.stage === 3;
+      const duration = pt.endMs - pt.startMs;
+      const lastCluster = clusters[clusters.length - 1];
+
+      if (lastCluster && pt.startMs - lastCluster.endMs <= 3 * 3600 * 1000) {
+        lastCluster.endMs = Math.max(lastCluster.endMs, pt.endMs);
+        if (!isAwake) lastCluster.sleepDurationMs += duration;
+      } else {
+        clusters.push({
+          startMs: pt.startMs,
+          endMs: pt.endMs,
+          sleepDurationMs: isAwake ? 0 : duration,
+        });
+      }
+    }
+
+    for (const cl of clusters) {
+      const effectiveDuration = cl.sleepDurationMs > 0 ? cl.sleepDurationMs : (cl.endMs - cl.startMs);
+      if (effectiveDuration < 30 * 60 * 1000) continue;
+
+      const hoursSlept = Math.round((effectiveDuration / (1000 * 3600)) * 10) / 10;
+      const dateStr = new Date(cl.startMs).toISOString().split("T")[0];
+
+      if (!datesWithSleep.has(dateStr)) {
+        datesWithSleep.add(dateStr);
+        sessions.push({
+          id: `gfit_sleep_${cl.startMs}`,
+          date: dateStr,
+          bedtime: new Date(cl.startMs).toISOString(),
+          wakeTime: new Date(cl.endMs).toISOString(),
+          hoursSlept,
+          quality: durationToSleepQuality(hoursSlept),
+          notes: "Imported from Google Fit (Android Bedtime tracking)",
+          isDemoData: false,
+        });
+      }
+    }
+  } catch (err) {
+    console.error("[GFit Sleep] Segment discovery error:", err);
+  }
+
+  console.log(`[GFit Sleep] Total mapped sleep sessions: ${sessions.length}`);
+  return sessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+// ─── Nutrition fetching & mapping ───────────────────────────────────────────
+
+/**
+ * Google Fit data type: com.google.nutrition
+ * Scope: https://www.googleapis.com/auth/fitness.nutrition.read
+ *
+ * Each point contains:
+ * - mapVal: nutrients map (calories in kcal, protein, carbs.total, fat.total, fiber, etc.)
+ * - intVal: meal_type (1: unknown, 2: breakfast, 3: lunch, 4: dinner, 5: snack)
+ * - stringVal: food_item name
+ *
+ * We query both:
+ * 1. Raw data sources for granular meals/food items.
+ * 2. Dataset aggregate for daily nutrition totals.
+ */
+
+function extractNutrientsFromMap(
+  mapEntries?: Array<{ key?: string; value?: { fpVal?: number } }>
+): GoogleFitNutrientBreakdown {
+  const nutrients: GoogleFitNutrientBreakdown = {
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fat: 0,
+  };
+
+  if (!Array.isArray(mapEntries)) return nutrients;
+
+  for (const entry of mapEntries) {
+    const k = entry.key?.toLowerCase();
+    const val = entry.value?.fpVal ?? 0;
+    if (!k || val <= 0) continue;
+
+    if (k === "calories") {
+      nutrients.calories += Math.round(val * 10) / 10;
+    } else if (k === "protein") {
+      nutrients.protein += Math.round(val * 10) / 10;
+    } else if (k === "carbs.total" || k === "carbs" || k === "total_carbs" || k === "total_carbohydrate") {
+      nutrients.carbs += Math.round(val * 10) / 10;
+    } else if (k === "fat.total" || k === "fat" || k === "total_fat") {
+      nutrients.fat += Math.round(val * 10) / 10;
+    } else if (k === "dietary_fiber" || k === "fiber") {
+      nutrients.fiber = Math.round(((nutrients.fiber ?? 0) + val) * 10) / 10;
+    } else if (k === "sugar" || k === "sugars") {
+      nutrients.sugar = Math.round(((nutrients.sugar ?? 0) + val) * 10) / 10;
+    } else if (k === "sodium") {
+      nutrients.sodium = Math.round(((nutrients.sodium ?? 0) + val) * 10) / 10;
+    }
+  }
+
+  return nutrients;
+}
+
+export async function fetchAndMapNutrition(
+  accessToken: string,
+  startMs: number,
+  endMs: number
+): Promise<GoogleFitNutritionData> {
+  const emptyResult: GoogleFitNutritionData = {
+    today: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+    recentDays: [],
+    meals: [],
+    totalMealsCount: 0,
+    lastSynced: Date.now(),
+  };
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  const mealLogs: GoogleFitMealLog[] = [];
+  const dailyMap = new Map<string, { nutrients: GoogleFitNutrientBreakdown; count: number }>();
+
+  try {
+    // 1. Discover nutrition data sources
+    let nutritionSources: string[] = [];
+    try {
+      const dsRes = await fetch("https://www.googleapis.com/fitness/v1/users/me/dataSources", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(3000),
+      });
+      if (dsRes.ok) {
+        const dsData = (await dsRes.json()) as {
+          dataSource?: { dataStreamId: string; dataType?: { name: string } }[];
+        };
+        const sources = dsData.dataSource ?? [];
+        nutritionSources = sources
+          .filter(
+            (s) =>
+              s.dataType?.name === "com.google.nutrition" ||
+              s.dataType?.name === "com.google.nutrition.summary" ||
+              s.dataType?.name?.toLowerCase().includes("nutrition") ||
+              s.dataStreamId?.toLowerCase().includes("nutrition")
+          )
+          .map((s) => s.dataStreamId);
+      }
+    } catch {
+      // Ignore discovery errors, fall back to aggregate
+    }
+
+    // 2. Query raw datasets if sources found
+    const MEAL_MAP: Record<number, GoogleFitMealLog["mealType"]> = {
+      1: "unknown",
+      2: "breakfast",
+      3: "lunch",
+      4: "dinner",
+      5: "snack",
+    };
+
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+    const nutritionStart = Math.max(startMs, endMs - THIRTY_DAYS);
+
+    for (const sourceId of nutritionSources) {
+      try {
+        const datasetId = `${nutritionStart}000000-${endMs}000000`;
+        const rawRes = await fetch(
+          `https://www.googleapis.com/fitness/v1/users/me/dataSources/${encodeURIComponent(sourceId)}/datasets/${datasetId}`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            signal: AbortSignal.timeout(3000),
+          }
+        );
+        if (rawRes.ok) {
+          const rawData = (await rawRes.json()) as {
+            point?: {
+              startTimeNanos?: string;
+              endTimeNanos?: string;
+              value?: Array<{
+                mapVal?: Array<{ key?: string; value?: { fpVal?: number } }>;
+                intVal?: number;
+                stringVal?: string;
+              }>;
+            }[];
+          };
+
+          for (const point of rawData.point ?? []) {
+            let mapVal: Array<{ key?: string; value?: { fpVal?: number } }> | undefined;
+            let mealTypeInt = 1;
+            let foodName = "";
+
+            for (const v of point.value ?? []) {
+              if (v.mapVal) mapVal = v.mapVal;
+              if (typeof v.intVal === "number") mealTypeInt = v.intVal;
+              if (typeof v.stringVal === "string" && v.stringVal) foodName = v.stringVal;
+            }
+
+            if (!mapVal) continue;
+            const nutrients = extractNutrientsFromMap(mapVal);
+            if (nutrients.calories <= 0 && nutrients.protein <= 0 && nutrients.carbs <= 0 && nutrients.fat <= 0) {
+              continue;
+            }
+
+            const nanos = point.startTimeNanos || point.endTimeNanos || "0";
+            const timeMs = Number(BigInt(nanos) / BigInt(1_000_000));
+            const dateObj = !isNaN(timeMs) && timeMs > 0 ? new Date(timeMs) : new Date();
+            const dateStr = dateObj.toISOString().split("T")[0];
+            const timeStr = `${String(dateObj.getHours()).padStart(2, "0")}:${String(dateObj.getMinutes()).padStart(2, "0")}`;
+            const mealType = MEAL_MAP[mealTypeInt] ?? "unknown";
+
+            mealLogs.push({
+              id: `gfit_meal_${nanos}_${mealLogs.length}`,
+              date: dateStr,
+              time: timeStr,
+              mealType,
+              name:
+                foodName ||
+                (mealType !== "unknown"
+                  ? mealType.charAt(0).toUpperCase() + mealType.slice(1)
+                  : "Logged Meal"),
+              nutrients,
+            });
+
+            // Aggregate into dailyMap
+            const existing = dailyMap.get(dateStr) ?? {
+              nutrients: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+              count: 0,
+            };
+            existing.nutrients.calories += nutrients.calories;
+            existing.nutrients.protein += nutrients.protein;
+            existing.nutrients.carbs += nutrients.carbs;
+            existing.nutrients.fat += nutrients.fat;
+            if (nutrients.fiber) existing.nutrients.fiber = (existing.nutrients.fiber ?? 0) + nutrients.fiber;
+            if (nutrients.sugar) existing.nutrients.sugar = (existing.nutrients.sugar ?? 0) + nutrients.sugar;
+            if (nutrients.sodium) existing.nutrients.sodium = (existing.nutrients.sodium ?? 0) + nutrients.sodium;
+            existing.count += 1;
+            dailyMap.set(dateStr, existing);
+          }
+        }
+      } catch (err) {
+        console.warn(`[GFit Nutrition] Source ${sourceId} fetch failed:`, err);
+      }
+    }
+
+    // 3. If raw source yielded no meals, run dataset:aggregate (clamped to max 30 days)
+    if (mealLogs.length === 0) {
+      let aggRes = await fetch("https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          aggregateBy: [{ dataTypeName: "com.google.nutrition.summary" }],
+          bucketByTime: { durationMillis: "86400000" },
+          startTimeMillis: String(nutritionStart),
+          endTimeMillis: String(endMs),
+        }),
+        signal: AbortSignal.timeout(3000),
+      });
+
+      if (!aggRes.ok) {
+        aggRes = await fetch("https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            aggregateBy: [{ dataTypeName: "com.google.nutrition" }],
+            bucketByTime: { durationMillis: "86400000" },
+            startTimeMillis: String(nutritionStart),
+            endTimeMillis: String(endMs),
+          }),
+          signal: AbortSignal.timeout(3000),
+        });
+      }
+
+      if (aggRes.ok) {
+        const aggData = (await aggRes.json()) as {
+          bucket?: {
+            startTimeMillis: string;
+            dataset?: {
+              point?: {
+                value?: Array<{
+                  mapVal?: Array<{ key?: string; value?: { fpVal?: number } }>;
+                }>;
+              }[];
+            }[];
+          }[];
+        };
+
+        for (const bucket of aggData.bucket ?? []) {
+          const bStartMs = Number(bucket.startTimeMillis);
+          const dateStr = new Date(bStartMs).toISOString().split("T")[0];
+          let bucketNutrients: GoogleFitNutrientBreakdown = {
+            calories: 0,
+            protein: 0,
+            carbs: 0,
+            fat: 0,
+          };
+          let count = 0;
+
+          for (const ds of bucket.dataset ?? []) {
+            for (const pt of ds.point ?? []) {
+              for (const v of pt.value ?? []) {
+                if (v.mapVal) {
+                  const n = extractNutrientsFromMap(v.mapVal);
+                  if (n.calories > 0 || n.protein > 0 || n.carbs > 0 || n.fat > 0) {
+                    bucketNutrients.calories += n.calories;
+                    bucketNutrients.protein += n.protein;
+                    bucketNutrients.carbs += n.carbs;
+                    bucketNutrients.fat += n.fat;
+                    if (n.fiber) bucketNutrients.fiber = (bucketNutrients.fiber ?? 0) + n.fiber;
+                    if (n.sugar) bucketNutrients.sugar = (bucketNutrients.sugar ?? 0) + n.sugar;
+                    if (n.sodium) bucketNutrients.sodium = (bucketNutrients.sodium ?? 0) + n.sodium;
+                    count++;
+                  }
+                }
+              }
+            }
+          }
+
+          if (count > 0) {
+            dailyMap.set(dateStr, { nutrients: bucketNutrients, count });
+          }
+        }
+      }
+    }
+
+    // Build recentDays array sorted descending
+    const recentDays = Array.from(dailyMap.entries())
+      .map(([date, data]) => ({
+        date,
+        nutrients: {
+          calories: Math.round(data.nutrients.calories),
+          protein: Math.round(data.nutrients.protein),
+          carbs: Math.round(data.nutrients.carbs),
+          fat: Math.round(data.nutrients.fat),
+          fiber: data.nutrients.fiber ? Math.round(data.nutrients.fiber) : undefined,
+          sugar: data.nutrients.sugar ? Math.round(data.nutrients.sugar) : undefined,
+          sodium: data.nutrients.sodium ? Math.round(data.nutrients.sodium) : undefined,
+        },
+        mealCount: data.count,
+      }))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // Today's nutrients: if today has an entry use it, otherwise most recent day within 48h
+    const todayEntry = recentDays.find((d) => d.date === todayStr);
+    const fallbackEntry = recentDays[0];
+    const todayNutrients: GoogleFitNutrientBreakdown = todayEntry
+      ? todayEntry.nutrients
+      : fallbackEntry && (Date.now() - new Date(fallbackEntry.date).getTime() < 48 * 3600 * 1000)
+      ? fallbackEntry.nutrients
+      : { calories: 0, protein: 0, carbs: 0, fat: 0 };
+
+    return {
+      today: todayNutrients,
+      recentDays,
+      meals: mealLogs.sort((a, b) => new Date(`${b.date}T${b.time || "00:00"}`).getTime() - new Date(`${a.date}T${a.time || "00:00"}`).getTime()),
+      totalMealsCount: mealLogs.length || recentDays.reduce((acc, d) => acc + d.mealCount, 0),
+      lastSynced: Date.now(),
+    };
+  } catch (err) {
+    console.error("[GFit Nutrition] Fetch error:", err);
+    return emptyResult;
+  }
+}
+
