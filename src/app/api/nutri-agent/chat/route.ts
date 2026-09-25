@@ -8,6 +8,7 @@ interface ChatRequestBody {
   isiContext: Record<string, unknown> | null;
   userProfile: Record<string, unknown> | null;
   intent: NutriIntent;
+  googleFitNutrition?: Record<string, unknown> | null;
 }
 
 export async function POST(request: Request) {
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
       isiContext = null,
       userProfile = null,
       intent = "chat",
+      googleFitNutrition = null,
     } = body;
 
     if (!Array.isArray(messages)) {
@@ -31,7 +33,8 @@ export async function POST(request: Request) {
     const systemInstruction = buildNutriSystemPrompt(
       isiContext as any,
       userProfile as any,
-      intent
+      intent,
+      googleFitNutrition as any
     );
 
     // ── Instantiate provider — reads GEMINI_API_KEY from process.env

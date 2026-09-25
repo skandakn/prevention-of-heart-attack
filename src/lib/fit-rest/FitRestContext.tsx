@@ -14,6 +14,7 @@ import type {
   WorkoutSession,
   SleepSession,
   RecoveryState,
+  GoogleFitNutritionData,
 } from "./types";
 import {
   DEFAULT_FITNESS_PROFILE,
@@ -63,6 +64,7 @@ interface FitRestContextValue {
   googleFitLastSynced: number | null;  // epoch ms
   googleFitSyncing: boolean;
   googleFitError: string | null;
+  googleFitNutrition: GoogleFitNutritionData | null;
   syncGoogleFit: () => Promise<void>;
   disconnectGoogleFit: () => void;
 }
@@ -86,6 +88,7 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
   const [googleFitLastSynced, setGoogleFitLastSynced] = useState<number | null>(null);
   const [googleFitSyncing, setGoogleFitSyncing] = useState(false);
   const [googleFitError, setGoogleFitError] = useState<string | null>(null);
+  const [googleFitNutrition, setGoogleFitNutrition] = useState<GoogleFitNutritionData | null>(null);
 
   // ── Load from localStorage on mount ───────────────────────────────────────
 
@@ -140,6 +143,16 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      // Load Google Fit nutrition (if previously synced)
+      const storedNutrition = localStorage.getItem(STORAGE_KEYS.NUTRITION_HISTORY);
+      if (storedNutrition) {
+        try {
+          setGoogleFitNutrition(JSON.parse(storedNutrition) as GoogleFitNutritionData);
+        } catch {
+          localStorage.removeItem(STORAGE_KEYS.NUTRITION_HISTORY);
+        }
+      }
+
       // ── Load Google Fit token (if previously connected) ───────────────────
       const storedToken = localStorage.getItem(GFIT_TOKEN_KEY);
       if (storedToken) {
@@ -177,6 +190,8 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
           const parsed = JSON.parse(json) as {
             token: GoogleFitToken;
             workouts: WorkoutSession[];
+            sleepSessions?: SleepSession[];
+            nutrition?: GoogleFitNutritionData;
             synced_at: number;
           };
 
@@ -189,7 +204,7 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
           setGoogleFitLastSynced(parsed.synced_at);
 
           // Merge workouts — replace any existing gfit_ entries
-          if (parsed.workouts.length > 0) {
+          if (parsed.workouts && parsed.workouts.length > 0) {
             const existingRaw = localStorage.getItem(STORAGE_KEYS.WORKOUT_HISTORY);
             const existing: WorkoutSession[] = existingRaw ? JSON.parse(existingRaw) : [];
             const nonGfit = existing.filter((w) => !w.id.startsWith("gfit_"));
@@ -198,6 +213,24 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
             );
             localStorage.setItem(STORAGE_KEYS.WORKOUT_HISTORY, JSON.stringify(merged));
             setWorkoutHistory(merged);
+          }
+
+          // Merge sleep sessions
+          if (parsed.sleepSessions && parsed.sleepSessions.length > 0) {
+            const existingRaw = localStorage.getItem(STORAGE_KEYS.SLEEP_HISTORY);
+            const existing: SleepSession[] = existingRaw ? JSON.parse(existingRaw) : [];
+            const nonGfit = existing.filter((s) => !s.id.startsWith("gfit_sleep_"));
+            const merged = [...parsed.sleepSessions, ...nonGfit].sort(
+              (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+            );
+            localStorage.setItem(STORAGE_KEYS.SLEEP_HISTORY, JSON.stringify(merged));
+            setSleepHistory(merged);
+          }
+
+          // Persist nutrition values
+          if (parsed.nutrition) {
+            localStorage.setItem(STORAGE_KEYS.NUTRITION_HISTORY, JSON.stringify(parsed.nutrition));
+            setGoogleFitNutrition(parsed.nutrition);
           }
 
           setGoogleFitError(null);
@@ -350,6 +383,7 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
         success?: boolean;
         workouts?: WorkoutSession[];
         sleepSessions?: SleepSession[];
+        nutrition?: GoogleFitNutritionData;
         token?: GoogleFitToken;
         error?: string;
       };
@@ -385,6 +419,14 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
           } catch {/* ignore */}
           return merged;
         });
+      }
+
+      // Persist fresh nutrition data
+      if (data.nutrition) {
+        setGoogleFitNutrition(data.nutrition);
+        try {
+          localStorage.setItem(STORAGE_KEYS.NUTRITION_HISTORY, JSON.stringify(data.nutrition));
+        } catch {/* ignore */}
       }
 
       // Persist refreshed token if it changed
@@ -434,9 +476,11 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
     setGoogleFitToken(null);
     setGoogleFitLastSynced(null);
     setGoogleFitError(null);
+    setGoogleFitNutrition(null);
     try {
       localStorage.removeItem(GFIT_TOKEN_KEY);
       localStorage.removeItem(GFIT_SYNCED_KEY);
+      localStorage.removeItem(STORAGE_KEYS.NUTRITION_HISTORY);
       // Remove only Google Fit imported workouts, keep manual entries
       setWorkoutHistory((prev) => {
         const manual = prev.filter((w) => !w.id.startsWith("gfit_"));
@@ -474,6 +518,7 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
     googleFitLastSynced,
     googleFitSyncing,
     googleFitError,
+    googleFitNutrition,
     syncGoogleFit,
     disconnectGoogleFit,
   };

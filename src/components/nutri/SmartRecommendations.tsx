@@ -29,6 +29,12 @@ async function fetchNutriResponse(
       "Why am I seeing these nutrition recommendations? Please explain the reasoning.",
   } as const;
 
+  let googleFitNutrition = null;
+  try {
+    const raw = localStorage.getItem("beatahead-gfit-nutrition");
+    if (raw) googleFitNutrition = JSON.parse(raw);
+  } catch {}
+
   const res = await fetch("/api/nutri-agent/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -37,6 +43,7 @@ async function fetchNutriResponse(
       isiContext,
       userProfile: profile,
       intent,
+      googleFitNutrition,
     }),
   });
 

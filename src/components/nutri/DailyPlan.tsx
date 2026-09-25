@@ -29,6 +29,12 @@ export function DailyPlan({ isiContext }: DailyPlanProps) {
     setLocalLoading(true);
 
     try {
+      let googleFitNutrition = null;
+      try {
+        const raw = localStorage.getItem("beatahead-gfit-nutrition");
+        if (raw) googleFitNutrition = JSON.parse(raw);
+      } catch {}
+
       const res = await fetch("/api/nutri-agent/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -42,6 +48,7 @@ export function DailyPlan({ isiContext }: DailyPlanProps) {
           isiContext: isiContext,
           userProfile: profile,
           intent: "daily_plan",
+          googleFitNutrition,
         }),
       });
 

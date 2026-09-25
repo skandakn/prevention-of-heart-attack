@@ -124,6 +124,12 @@ export function NutriProvider({ children }: { children: React.ReactNode }) {
           .filter((m) => m.role === "user" || m.role === "assistant")
           .map((m) => ({ role: m.role, content: m.content }));
 
+        let googleFitNutrition = null;
+        try {
+          const raw = localStorage.getItem("beatahead-gfit-nutrition");
+          if (raw) googleFitNutrition = JSON.parse(raw);
+        } catch {}
+
         const res = await fetch("/api/nutri-agent/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -132,6 +138,7 @@ export function NutriProvider({ children }: { children: React.ReactNode }) {
             isiContext: isiContext ?? null,
             userProfile: profileRef.current,
             intent,
+            googleFitNutrition,
           }),
         });
 

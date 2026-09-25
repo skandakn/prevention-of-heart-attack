@@ -10,6 +10,10 @@ import {
   AlertTriangle,
   Unplug,
   Zap,
+  Flame,
+  Utensils,
+  Moon,
+  Info,
 } from "lucide-react";
 
 // ─── Google icon (inline SVG — no external dep needed) ───────────────────────
@@ -57,8 +61,8 @@ function formatLastSynced(ts: number | null): string {
 }
 
 function connectGoogleFit() {
-  // Navigate in the same tab — Google will redirect back to /fitness?gfit_data=...
-  window.location.href = "/api/google-fit/auth";
+  const currentPath = typeof window !== "undefined" ? window.location.pathname : "/fitness";
+  window.location.href = `/api/google-fit/auth?returnTo=${encodeURIComponent(currentPath)}`;
 }
 
 // ─── Variant copy map ────────────────────────────────────────────────────────
@@ -68,21 +72,21 @@ type GoogleFitVariant = "fitness" | "nutri" | "rest";
 const VARIANT_COPY: Record<
   GoogleFitVariant,
   {
+    title: string;
     connectedDescription: string;
     disconnectedDescription: string;
-    statLabel: string;
     features: string[];
     successNote: string;
   }
 > = {
   fitness: {
+    title: "Google Fit Activity",
     connectedDescription:
-      "Your Google Fit workouts are synced into the fitness agent automatically.",
+      "Your Google Fit workouts and step activity are synced into the fitness agent automatically.",
     disconnectedDescription:
       "Connect Google Fit to import your real workout sessions and give the AI coach accurate activity data.",
-    statLabel: "Workouts Imported",
     features: [
-      "Auto-imports runs, cycling, strength & more",
+      "Auto-imports runs, cycling, strength & daily steps",
       "Replaces demo data with your real workouts",
       "AI coach adapts plans to your actual activity",
       "Read-only access — we never write to Google Fit",
@@ -91,34 +95,34 @@ const VARIANT_COPY: Record<
       "Workout data is live — the AI coach is using your real Google Fit activity.",
   },
   nutri: {
+    title: "Google Fit Nutrition",
     connectedDescription:
-      "Your Google Fit activity is synced into the nutrition agent to personalise your calorie and macro targets.",
+      "Your Google Fit nutrition logs and dietary intake are synced directly into Nutri Agent to track your real calories and macronutrients.",
     disconnectedDescription:
-      "Connect Google Fit to let the nutrition agent factor in your real activity levels when calculating calorie needs.",
-    statLabel: "Activities Synced",
+      "Connect Google Fit to import your real dietary logs, daily calorie intake, and macronutrient breakdown (protein, carbs, fats).",
     features: [
-      "Activity data used to calculate your calorie budget",
-      "Replaces estimated values with your real energy expenditure",
-      "AI nutrition plan adapts to your actual movement",
-      "Read-only access — we never write to Google Fit",
+      "Auto-imports daily calories, protein, carbs, and fats from Google Fit",
+      "Syncs with MyFitnessPal, Samsung Health, Lifesum & Cronometer",
+      "Nutri Agent personalizes dietary advice and meal plans to your actual intake",
+      "Read-only access — we never modify your Google Fit logs",
     ],
     successNote:
-      "Activity data is live — the nutrition agent is using your real Google Fit data.",
+      "Nutrition values are live — Nutri Agent is using your real Google Fit dietary intake.",
   },
   rest: {
+    title: "Google Fit Sleep & Recovery",
     connectedDescription:
-      "Your Google Fit activity is synced into the sleep agent to personalise your recovery recommendations.",
+      "Your Google Fit sleep sessions and recovery data are synced into the sleep agent to personalize your recovery recommendations.",
     disconnectedDescription:
-      "Connect Google Fit to let the sleep agent use your real activity levels when tailoring wind-down and recovery plans.",
-    statLabel: "Activities Synced",
+      "Connect Google Fit to let the sleep agent use your real sleep tracking data when tailoring wind-down and recovery plans.",
     features: [
-      "Activity data improves sleep quality recommendations",
-      "Replaces estimated values with your real movement patterns",
-      "AI sleep coach adapts recovery plans to your actual activity",
+      "Auto-imports sleep duration, bedtime, and wake times from Google Fit",
+      "Syncs with Pixel Watch, Oura, Fitbit & sleep tracking wearables",
+      "AI sleep coach adapts recovery plans to your actual sleep stages",
       "Read-only access — we never write to Google Fit",
     ],
     successNote:
-      "Activity data is live — the sleep agent is using your real Google Fit data.",
+      "Sleep data is live — the sleep agent is using your real Google Fit sleep history.",
   },
 };
 
@@ -133,10 +137,13 @@ export function GoogleFitSync({ variant = "fitness" }: { variant?: GoogleFitVari
     syncGoogleFit,
     disconnectGoogleFit,
     workoutHistory,
+    sleepHistory,
+    googleFitNutrition,
   } = useFitRest();
 
   const copy = VARIANT_COPY[variant];
   const gfitWorkoutCount = workoutHistory.filter((w) => w.id.startsWith("gfit_")).length;
+  const gfitSleepCount = sleepHistory.filter((s) => s.id.startsWith("gfit_sleep_")).length;
 
   return (
     <Card className={cn(
@@ -148,7 +155,7 @@ export function GoogleFitSync({ variant = "fitness" }: { variant?: GoogleFitVari
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <GoogleIcon className="h-5 w-5 shrink-0" />
-          <CardTitle className="text-base">Google Fit</CardTitle>
+          <CardTitle className="text-base">{copy.title}</CardTitle>
           {googleFitConnected && (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 border border-emerald-200 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -166,24 +173,187 @@ export function GoogleFitSync({ variant = "fitness" }: { variant?: GoogleFitVari
         {/* ── Connected state ────────────────────────────────────────── */}
         {googleFitConnected ? (
           <>
-            {/* Stats row */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2.5">
-                <p className="text-[11px] font-medium text-navy-500 uppercase tracking-wide mb-1">
-                  {copy.statLabel}
-                </p>
-                <p className="text-xl font-bold text-navy-900">{gfitWorkoutCount}</p>
-                <p className="text-[11px] text-navy-500 mt-0.5">all time</p>
+            {/* ── 1. Nutri Variant: Display Nutrition Values (not fitness) ── */}
+            {variant === "nutri" ? (
+              <div className="space-y-3">
+                {/* 4 Macro & Calorie Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {/* Calories */}
+                  <div className="rounded-lg border border-orange-100 bg-white p-3 shadow-xs">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-[11px] font-semibold text-navy-500 uppercase tracking-wide">
+                        Calories
+                      </p>
+                      <Flame className="h-4 w-4 text-orange-500" />
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold text-navy-900">
+                        {Math.round(googleFitNutrition?.today?.calories ?? 0).toLocaleString()}
+                      </span>
+                      <span className="text-xs text-navy-400 font-medium">kcal</span>
+                    </div>
+                    <p className="text-[10px] text-navy-400 mt-0.5">Today&apos;s intake</p>
+                  </div>
+
+                  {/* Protein */}
+                  <div className="rounded-lg border border-emerald-100 bg-white p-3 shadow-xs">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-[11px] font-semibold text-navy-500 uppercase tracking-wide">
+                        Protein
+                      </p>
+                      <Utensils className="h-3.5 w-3.5 text-emerald-600" />
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold text-emerald-700">
+                        {Math.round(googleFitNutrition?.today?.protein ?? 0)}
+                      </span>
+                      <span className="text-xs text-navy-400 font-medium">g</span>
+                    </div>
+                    <p className="text-[10px] text-navy-400 mt-0.5">Muscle &amp; repair</p>
+                  </div>
+
+                  {/* Carbs */}
+                  <div className="rounded-lg border border-amber-100 bg-white p-3 shadow-xs">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-[11px] font-semibold text-navy-500 uppercase tracking-wide">
+                        Carbs
+                      </p>
+                      <Zap className="h-3.5 w-3.5 text-amber-500" />
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold text-amber-800">
+                        {Math.round(googleFitNutrition?.today?.carbs ?? 0)}
+                      </span>
+                      <span className="text-xs text-navy-400 font-medium">g</span>
+                    </div>
+                    <p className="text-[10px] text-navy-400 mt-0.5">Energy fuel</p>
+                  </div>
+
+                  {/* Fats */}
+                  <div className="rounded-lg border border-blue-100 bg-white p-3 shadow-xs">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-[11px] font-semibold text-navy-500 uppercase tracking-wide">
+                        Fats
+                      </p>
+                      <span className="text-xs font-semibold text-blue-500">Lipid</span>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold text-blue-800">
+                        {Math.round(googleFitNutrition?.today?.fat ?? 0)}
+                      </span>
+                      <span className="text-xs text-navy-400 font-medium">g</span>
+                    </div>
+                    <p className="text-[10px] text-navy-400 mt-0.5">Essential lipids</p>
+                  </div>
+                </div>
+
+                {/* Sub-row: Sync metadata & micronutrients */}
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/70 border border-emerald-100 px-3 py-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-3 text-navy-600">
+                    <span className="font-medium">
+                      Meals logged: <strong className="text-navy-900">{googleFitNutrition?.totalMealsCount ?? 0}</strong>
+                    </span>
+                    {googleFitNutrition?.today?.fiber !== undefined && googleFitNutrition.today.fiber > 0 && (
+                      <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">
+                        Fiber: {googleFitNutrition.today.fiber}g
+                      </span>
+                    )}
+                    {googleFitNutrition?.today?.sodium !== undefined && googleFitNutrition.today.sodium > 0 && (
+                      <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700">
+                        Sodium: {googleFitNutrition.today.sodium}mg
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-navy-500">
+                    Last synced: <span className="font-semibold text-navy-800">{formatLastSynced(googleFitLastSynced)}</span>
+                  </div>
+                </div>
+
+                {/* Helpful guidance if 0 food logged */}
+                {(!googleFitNutrition || (googleFitNutrition.today.calories === 0 && googleFitNutrition.totalMealsCount === 0)) && (
+                  <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50/50 p-2.5 text-xs text-navy-600">
+                    <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                    <p className="leading-relaxed">
+                      <strong>0 kcal logged today from Google Fit.</strong> Meals tracked in Google Fit or connected nutrition apps (MyFitnessPal, Samsung Health, Lifesum, Cronometer) sync here automatically when you tap <em>Sync Now</em>.
+                    </p>
+                  </div>
+                )}
+
+                {/* Recent meals preview if present */}
+                {googleFitNutrition?.meals && googleFitNutrition.meals.length > 0 && (
+                  <div className="rounded-lg border border-emerald-100 bg-white p-3 space-y-2">
+                    <p className="text-[11px] font-semibold text-navy-500 uppercase tracking-wide">
+                      Recent Meals from Google Fit
+                    </p>
+                    <div className="space-y-1.5">
+                      {googleFitNutrition.meals.slice(0, 3).map((m) => (
+                        <div
+                          key={m.id}
+                          className="flex items-center justify-between text-xs py-1 border-b border-navy-50 last:border-0"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="capitalize rounded-sm bg-navy-100 px-1.5 py-0.5 text-[10px] font-semibold text-navy-700">
+                              {m.mealType}
+                            </span>
+                            <span className="font-medium text-navy-900">{m.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-navy-500 text-[11px]">
+                            <span>{Math.round(m.nutrients.calories)} kcal</span>
+                            <span>·</span>
+                            <span>{Math.round(m.nutrients.protein)}g P</span>
+                            <span>·</span>
+                            <span>{Math.round(m.nutrients.carbs)}g C</span>
+                            <span>·</span>
+                            <span>{Math.round(m.nutrients.fat)}g F</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2.5">
-                <p className="text-[11px] font-medium text-navy-500 uppercase tracking-wide mb-1">
-                  Last Synced
-                </p>
-                <p className="text-sm font-semibold text-navy-900 mt-1">
-                  {formatLastSynced(googleFitLastSynced)}
-                </p>
+            ) : variant === "rest" ? (
+              /* ── 2. Rest Variant: Display Sleep Values ── */
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-indigo-100 bg-white px-3 py-2.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[11px] font-medium text-navy-500 uppercase tracking-wide">
+                      Sleep Sessions
+                    </p>
+                    <Moon className="h-3.5 w-3.5 text-indigo-500" />
+                  </div>
+                  <p className="text-xl font-bold text-navy-900">{gfitSleepCount}</p>
+                  <p className="text-[11px] text-navy-500 mt-0.5">all time</p>
+                </div>
+                <div className="rounded-lg border border-indigo-100 bg-white px-3 py-2.5">
+                  <p className="text-[11px] font-medium text-navy-500 uppercase tracking-wide mb-1">
+                    Last Synced
+                  </p>
+                  <p className="text-sm font-semibold text-navy-900 mt-1">
+                    {formatLastSynced(googleFitLastSynced)}
+                  </p>
+                </div>
               </div>
-            </div>
+            ) : (
+              /* ── 3. Fitness Variant: Display Workouts ── */
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2.5">
+                  <p className="text-[11px] font-medium text-navy-500 uppercase tracking-wide mb-1">
+                    Workouts Imported
+                  </p>
+                  <p className="text-xl font-bold text-navy-900">{gfitWorkoutCount}</p>
+                  <p className="text-[11px] text-navy-500 mt-0.5">all time</p>
+                </div>
+                <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2.5">
+                  <p className="text-[11px] font-medium text-navy-500 uppercase tracking-wide mb-1">
+                    Last Synced
+                  </p>
+                  <p className="text-sm font-semibold text-navy-900 mt-1">
+                    {formatLastSynced(googleFitLastSynced)}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Error banner */}
             {googleFitError && (
@@ -194,7 +364,7 @@ export function GoogleFitSync({ variant = "fitness" }: { variant?: GoogleFitVari
             )}
 
             {/* Action buttons */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2 pt-1">
               <Button
                 size="sm"
                 variant="default"
@@ -239,7 +409,7 @@ export function GoogleFitSync({ variant = "fitness" }: { variant?: GoogleFitVari
               ))}
             </ul>
 
-            {/* Error banner (e.g. popup closed before completion) */}
+            {/* Error banner */}
             {googleFitError && (
               <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
                 <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
@@ -259,8 +429,8 @@ export function GoogleFitSync({ variant = "fitness" }: { variant?: GoogleFitVari
             </Button>
 
             <p className="text-[10px] text-navy-400 leading-relaxed">
-              You&apos;ll be redirected to Google to authorise read-only access to your fitness
-              activity data. No data is shared with third parties.
+              You&apos;ll be redirected to Google to authorise read-only access to your Google Fit
+              health and nutrition data. No data is shared with third parties.
             </p>
           </>
         )}

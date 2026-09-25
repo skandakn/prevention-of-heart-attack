@@ -275,6 +275,39 @@ export const DEFAULT_REST_PROFILE: RestProfile = {
   isProfileComplete: false,
 };
 
+// ─── Google Fit Nutrition Types ──────────────────────────────────────────────
+
+export interface GoogleFitNutrientBreakdown {
+  calories: number;       // kcal
+  protein: number;        // grams
+  carbs: number;          // grams
+  fat: number;            // grams
+  fiber?: number;         // grams
+  sugar?: number;         // grams
+  sodium?: number;        // mg
+}
+
+export interface GoogleFitMealLog {
+  id: string;
+  date: string;           // YYYY-MM-DD
+  time?: string;          // HH:mm
+  mealType: "breakfast" | "lunch" | "dinner" | "snack" | "unknown";
+  name: string;           // food item or meal name
+  nutrients: GoogleFitNutrientBreakdown;
+}
+
+export interface GoogleFitNutritionData {
+  today: GoogleFitNutrientBreakdown;
+  recentDays: Array<{
+    date: string;
+    nutrients: GoogleFitNutrientBreakdown;
+    mealCount: number;
+  }>;
+  meals: GoogleFitMealLog[];
+  totalMealsCount: number;
+  lastSynced: number;
+}
+
 // ─── Storage Keys ─────────────────────────────────────────────────────────────
 
 export const STORAGE_KEYS = {
@@ -282,6 +315,7 @@ export const STORAGE_KEYS = {
   REST_PROFILE: "beatahead-rest-profile",
   WORKOUT_HISTORY: "beatahead-workout-history",
   SLEEP_HISTORY: "beatahead-sleep-history",
+  NUTRITION_HISTORY: "beatahead-gfit-nutrition",
 } as const;
 
 // ─── Label Maps ───────────────────────────────────────────────────────────────
