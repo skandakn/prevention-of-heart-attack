@@ -45,3 +45,11 @@ next-env.d.ts
 .env*
 scratch/
 
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+

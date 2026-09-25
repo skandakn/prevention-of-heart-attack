@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { execFileSync } from "child_process";
 import path from "path";
+import fs from "fs";
 
 // 26 Expected Matrix A Features
 const EXPECTED_FEATURES = [
@@ -65,8 +66,18 @@ const FEATURE_BOUNDS: Record<string, [number, number]> = {
 };
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://127.0.0.1:8000";
-const ML_WORKSPACE_DIR = "C:\\ML Model - Ischemic";
-const PYTHON_PATH = path.join(ML_WORKSPACE_DIR, ".venv", "Scripts", "python.exe");
+const ML_WORKSPACE_DIR = process.env.ML_WORKSPACE_DIR || (
+  fs.existsSync(path.join(process.cwd(), "backend"))
+    ? path.join(process.cwd(), "backend")
+    : "C:\\ML Model - Ischemic"
+);
+const PYTHON_PATH = process.env.PYTHON_PATH || (
+  fs.existsSync(path.join(ML_WORKSPACE_DIR, ".venv", "Scripts", "python.exe"))
+    ? path.join(ML_WORKSPACE_DIR, ".venv", "Scripts", "python.exe")
+    : fs.existsSync("C:\\ML Model - Ischemic\\.venv\\Scripts\\python.exe")
+    ? "C:\\ML Model - Ischemic\\.venv\\Scripts\\python.exe"
+    : "python"
+);
 const ML_SERVICE_SCRIPT = path.join(ML_WORKSPACE_DIR, "src", "ml_service.py");
 
 export async function GET() {
