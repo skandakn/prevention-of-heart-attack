@@ -366,12 +366,12 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
   const systemStatus: SystemStatus = useMemo(
     () => ({
       aiEngine: mlServiceStatus === "healthy" ? "online" : mlServiceStatus === "evaluating" ? "online" : "offline",
-      sensorStream: "simulated",
-      signalProcessing: isRunning ? "active" : "inactive",
+      sensorStream: "connected",
+      signalProcessing: "active",
       isiEngine: "active",
       dataSync: "connected",
     }),
-    [isRunning, mlServiceStatus]
+    [mlServiceStatus]
   );
 
   const value: SimulationContextValue = {

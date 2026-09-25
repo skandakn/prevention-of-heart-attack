@@ -1,15 +1,20 @@
 "use client";
 
 import { useSimulation } from "@/lib/simulation/SimulationContext";
-import { cn, getQualityColor, getQualityLabel, getTrendLabel } from "@/lib/utils";
+import { cn, getTrendLabel } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
-import { Activity, TrendingUp, Target, Signal, Cpu, ShieldAlert, CheckCircle2 } from "lucide-react";
+import { Activity, TrendingUp, Target, Cpu, ShieldAlert, CheckCircle2, HeartPulse } from "lucide-react";
 
 export function DashboardStats() {
-  const { currentScore, currentSample, modelProbability, modelAlert, mlServiceStatus } = useSimulation();
+  const { currentScore, currentSample, modelProbability, modelAlert, mlServiceStatus, baseline, healthRecord } = useSimulation();
 
   const prob = currentScore?.modelProbability ?? modelProbability ?? null;
   const isAlert = currentScore?.modelAlert ?? modelAlert ?? false;
+
+  const hrValue = healthRecord?.restingHeartRate ?? baseline.restingHR;
+  const bpSuffix = healthRecord?.systolicBP && healthRecord?.diastolicBP 
+    ? ` · BP ${healthRecord.systolicBP}/${healthRecord.diastolicBP}`
+    : "";
 
   const stats = [
     {
@@ -27,14 +32,14 @@ export function DashboardStats() {
     },
     {
       label: "Baseline",
-      value: currentScore?.baseline ?? "--",
+      value: currentScore?.baseline ?? baseline.isi,
       icon: Target,
     },
     {
-      label: "Signal Quality",
-      value: currentSample ? `${Math.round(currentSample.signalQuality.overall)}%` : "--",
-      icon: Signal,
-      quality: currentSample?.signalQuality.overall,
+      label: "Resting Vitals",
+      value: `${hrValue} bpm`,
+      suffix: bpSuffix,
+      icon: HeartPulse,
     },
     {
       label: "ML Model (p_model)",
@@ -67,9 +72,9 @@ export function DashboardStats() {
                   <Icon className={cn("w-4 h-4", stat.accent ? "text-cardiac" : stat.isAlert ? "text-rose-600" : "text-navy-600")} />
                 </div>
               </div>
-              {stat.quality !== undefined && (
-                <p className={cn("mt-2 text-xs font-medium", getQualityColor(stat.quality))}>
-                  {getQualityLabel(stat.quality)}
+              {stat.label === "Resting Vitals" && (
+                <p className="mt-2 text-xs font-medium text-emerald-600">
+                  From Health Record
                 </p>
               )}
               {stat.mlCard && (

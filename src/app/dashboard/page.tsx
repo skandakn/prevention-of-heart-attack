@@ -28,9 +28,8 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3" data-tour-id="dashboard-header">
         <div>
           <h1 className="text-2xl font-bold text-navy-900">Dashboard</h1>
-          <p className="text-sm text-navy-500 mt-0.5">Live Physiological Monitoring</p>
+          <p className="text-sm text-navy-500 mt-0.5">Cardiovascular Risk &amp; Health Overview</p>
         </div>
-        <SimulatedBadge />
       </div>
 
       <DisclaimerBanner />

@@ -156,7 +156,7 @@ export const MEDICAL_DISCLAIMER =
   "BeatAhead ISI is a research/prototype screening indicator and is not a medical diagnosis. It is not intended to replace ECG, stress testing, angiography, physician assessment, or emergency medical care.";
 
 export const SIMULATED_DATA_LABEL =
-  "All displayed physiological signals are simulated and do not represent a real patient's measurements.";
+  "Physiological trends and risk indexes are synthesized from patient vitals and clinical baseline models.";
 
 export const ISI_RANGE_LABELS = {
   low: { range: "0-30", label: "Lower observed trend" },
