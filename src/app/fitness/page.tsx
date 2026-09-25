@@ -8,7 +8,6 @@ import { GoogleFitSync } from "@/components/fitness/GoogleFitSync";
 import { FitnessReport } from "@/components/fitness/FitnessReport";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DisclaimerBanner } from "@/components/layout/Footer";
 import { SimulatedBadge } from "@/components/layout/Toast";
 import { Dumbbell, CheckCircle2, Calendar, TrendingUp, Clock, Target, Activity, History, Award } from "lucide-react";
 import { EXERCISE_TYPE_LABELS } from "@/lib/fit-rest/types";
@@ -59,9 +58,6 @@ function FitnessPageInner() {
         </div>
         <SimulatedBadge className="self-start sm:self-auto shrink-0" />
       </div>
-
-      {/* ── Disclaimer ────────────────────────────────────────────────── */}
-      <DisclaimerBanner />
 
       {/* ── Fitness Overview Section ──────────────────────────────────── */}
       <div className="space-y-3">
