@@ -24,11 +24,12 @@ import {
   FileText,
   HeartPulse,
   LogIn,
+  Compass,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSubscription } from "@/lib/subscription/SubscriptionContext";
+import { useTour } from "@/lib/tour/TourContext";
 import { useState, useEffect } from "react";
-import { DemoModePanel } from "./DemoModePanel";
 import { SystemStatusPanel } from "./SystemStatusPanel";
 import { SettingsButton } from "./SettingsPanel";
 import { Button } from "@/components/ui/button";
@@ -48,8 +49,9 @@ function useIsOnboarding(pathname: string): boolean {
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/helpline", label: "Cardiac Helpline", icon: PhoneCall },
+  { href: "/calls", label: "Call Records", icon: FileText },
   { href: "/health-record", label: "Health Record", icon: HeartPulse },
-  { href: "/monitor", label: "Live Monitor", icon: Radio },
   { href: "/signals", label: "Signals", icon: Activity },
   { href: "/trends", label: "Trends", icon: BarChart3 },
   { href: "/insights", label: "AI Insights", icon: Brain },
@@ -62,6 +64,7 @@ const navItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const isOnboarding = useIsOnboarding(pathname);
+  const { startTour } = useTour();
   const isLanding = pathname === "/";
   const isAuthPage = pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up");
 
@@ -109,6 +112,23 @@ export function Sidebar() {
               {item.label}
             </Link>
           );
+          
+          // Add guided tour launcher after Overview item
+          if (item.href === "/dashboard") {
+            return (
+              <div key={`${item.href}-with-tour`}>
+                {linkElement}
+                <button
+                  type="button"
+                  onClick={startTour}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-cardiac hover:bg-red-50 w-full"
+                >
+                  <Compass className="w-4 h-4" />
+                  Start Guided Tour
+                </button>
+              </div>
+            );
+          }
           
           // Wrap wellness agents
           if (isFirstWellnessAgent) {
