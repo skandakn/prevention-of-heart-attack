@@ -8,7 +8,6 @@ import {
   CheckCircle2, 
   Clock, 
   Cpu, 
-  Info, 
   RefreshCw, 
   ShieldAlert, 
   Sliders, 
@@ -350,18 +349,6 @@ export function ResearchModelSignalCard() {
               )}
             </div>
           </div>
-        </div>
-
-        {/* Regulatory & Provenance Callout */}
-        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-1.5">
-          <div className="flex items-center gap-1.5 font-bold text-slate-900">
-            <Info className="w-4 h-4 text-slate-600" />
-            Model Provenance & Non-Diagnostic Disclaimer
-          </div>
-          <p className="leading-relaxed">
-            This card surfaces the frozen Phase 5/Phase 6 machine learning inference pipeline (frozen XGBoost, 26 Matrix A features, calibrated threshold 0.156742). 
-            <strong className="text-slate-900"> Non-diagnostic investigational tool.</strong> This output is provided strictly for local software staging, engineering demonstration, and research reproducibility. It is not FDA cleared or CE marked and must never be utilized as a substitute for certified clinical diagnostics or physician assessment.
-          </p>
         </div>
       </CardContent>
     </Card>
