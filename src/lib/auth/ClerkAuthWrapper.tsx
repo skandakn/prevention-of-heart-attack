@@ -92,6 +92,8 @@ function ClerkAuthBridge({ children }: { children: React.ReactNode }) {
       };
       setDemoUser(newUser);
       persistDemoUser(newUser);
+      // Clear vitals session flag so the modal re-appears on this new sign-in
+      try { sessionStorage.removeItem("beatahead-vitals-session-checked"); } catch {/* ignore */}
     },
     []
   );
@@ -99,6 +101,8 @@ function ClerkAuthBridge({ children }: { children: React.ReactNode }) {
   const handleSignOut = async () => {
     setDemoUser(null);
     persistDemoUser(null);
+    // Clear vitals session flag on sign-out too
+    try { sessionStorage.removeItem("beatahead-vitals-session-checked"); } catch {/* ignore */}
     if (clerkSignedIn && clerkSignOut) {
       try {
         await clerkSignOut();
@@ -159,6 +163,8 @@ function UnconfiguredAuthBridge({ children }: { children: React.ReactNode }) {
       };
       setSessionUser(newUser);
       persistDemoUser(newUser);
+      // Clear vitals session flag so the modal re-appears on this new sign-in
+      try { sessionStorage.removeItem("beatahead-vitals-session-checked"); } catch {/* ignore */}
     },
     []
   );
@@ -166,6 +172,8 @@ function UnconfiguredAuthBridge({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     setSessionUser(null);
     persistDemoUser(null);
+    // Clear vitals session flag on sign-out
+    try { sessionStorage.removeItem("beatahead-vitals-session-checked"); } catch {/* ignore */}
     router.push("/sign-in");
   }, [router]);
 

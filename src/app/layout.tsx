@@ -10,6 +10,7 @@ import { AppContentWrapper } from "@/components/layout/AppContentWrapper";
 import { Toast } from "@/components/layout/Toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CardiacVoiceWidget } from "@/components/voice/CardiacVoiceWidget";
+import { VitalsCheckModal } from "@/components/health/VitalsCheckModal";
 import { TourProvider } from "@/lib/tour/TourContext";
 import { GuidedTour } from "@/components/tour/GuidedTour";
 
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <MobileNav />
                   <Toast />
                   <CardiacVoiceWidget />
+                  <VitalsCheckModal />
                 </TourProvider>
               </TooltipProvider>
             </SimulationProvider>
