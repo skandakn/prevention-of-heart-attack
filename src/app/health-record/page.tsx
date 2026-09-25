@@ -21,9 +21,11 @@ import {
   Zap,
   Phone,
   UserCheck,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBeatAheadAuth } from "@/lib/auth/ClerkAuthWrapper";
+import { generatePersonalHealthRecordPDF } from "@/lib/pdf/generateClinicalReport";
 import {
   BIOLOGICAL_SEX_OPTIONS,
   SMOKING_STATUS_OPTIONS,
@@ -309,12 +311,24 @@ function HealthRecordPageContent() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(0);
   const [animDir, setAnimDir] = useState<"forward" | "back">("forward");
   const [animating, setAnimating] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
+
+  const exportPDF = async () => {
+    setIsExportingPdf(true);
+    try {
+      await generatePersonalHealthRecordPDF(record);
+    } catch (err) {
+      console.error("Failed to generate health record PDF:", err);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   // ── localStorage key for this user ──────────────────────────────────────────
   const lsKey = `beatahead-patient-record-${effectiveUserId}`;
@@ -534,10 +548,22 @@ function HealthRecordPageContent() {
               </div>
               <p className="text-sm text-white/40">Keep key health information ready for your cardiac-care conversations.</p>
             </div>
-            <p className="text-xs text-white/30 text-right">
-              Last saved<br />
-              <span className="text-white/50">{updatedLabel}</span>
-            </p>
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                onClick={exportPDF}
+                disabled={isExportingPdf}
+                size="sm"
+                className="gap-2 bg-red-600/80 hover:bg-red-600 text-white border border-red-500/30 text-xs shadow-lg shadow-red-500/10 h-8"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                {isExportingPdf ? "Exporting..." : "Export PDF"}
+              </Button>
+              <p className="text-xs text-white/30 text-right">
+                Last saved<br />
+                <span className="text-white/50">{updatedLabel}</span>
+              </p>
+            </div>
           </div>
         )}
 
