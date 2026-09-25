@@ -41,7 +41,9 @@ export async function GET(request: Request) {
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+  const redirectUri = origin.includes("localhost")
+    ? `${origin}/api/google-fit/callback`
+    : (process.env.GOOGLE_REDIRECT_URI || `${origin}/api/google-fit/callback`);
 
   // ── OAuth error from Google ────────────────────────────────────────────────
   if (error) {
@@ -52,7 +54,7 @@ export async function GET(request: Request) {
     return redirect(`${origin}${safePage}?gfit_error=${encodeURIComponent("Missing authorisation code.")}`);
   }
 
-  if (!clientId || !clientSecret || !redirectUri) {
+  if (!clientId || !clientSecret) {
     return redirect(`${origin}${safePage}?gfit_error=${encodeURIComponent("Google OAuth is not configured on the server.")}`);
   }
 

@@ -7,18 +7,22 @@ import { NextResponse } from "next/server";
  */
 export async function GET(request: Request) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI;
 
-  if (!clientId || !redirectUri) {
+  if (!clientId) {
     return NextResponse.json(
-      { error: "Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_REDIRECT_URI." },
+      { error: "Google OAuth is not configured. Set GOOGLE_CLIENT_ID." },
       { status: 503 }
     );
   }
 
-  // Preserve the returnTo page passed as a query param (e.g. /rest, /nutri-agent)
-  const { searchParams } = new URL(request.url);
+  const { searchParams, origin } = new URL(request.url);
   const returnTo = searchParams.get("returnTo") ?? "/fitness";
+
+  // If running locally, use localhost callback so the user stays on localhost;
+  // on production, use configured GOOGLE_REDIRECT_URI or current origin.
+  const redirectUri = origin.includes("localhost")
+    ? `${origin}/api/google-fit/callback`
+    : (process.env.GOOGLE_REDIRECT_URI || `${origin}/api/google-fit/callback`);
 
   // Scopes: read fitness activity sessions + activity segments + sleep + nutrition (no write access)
   const scopes = [
