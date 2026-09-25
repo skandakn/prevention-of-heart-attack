@@ -392,7 +392,10 @@ export async function fetchAndMapSleep(
 
   // 2. Discover sleep data sources (com.google.sleep.segment) & read raw datasets
   try {
-    let sleepSources: string[] = ["derived:com.google.sleep.segment:com.google.android.gms:merged"];
+    let sleepSources: string[] = [
+      "derived:com.google.sleep.segment:com.google.android.gms:merged",
+      "derived:com.google.activity.segment:com.google.android.gms:merge_activity_segments",
+    ];
     try {
       const dsRes = await fetch("https://www.googleapis.com/fitness/v1/users/me/dataSources", {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -405,7 +408,10 @@ export async function fetchAndMapSleep(
           .filter(
             (s) =>
               s.dataType?.name === "com.google.sleep.segment" ||
-              s.dataStreamId.toLowerCase().includes("sleep")
+              s.dataType?.name === "com.google.activity.segment" ||
+              s.dataStreamId.toLowerCase().includes("sleep") ||
+              s.dataStreamId.toLowerCase().includes("bedtime") ||
+              s.dataStreamId.toLowerCase().includes("deskclock")
           )
           .map((s) => s.dataStreamId);
         
@@ -417,35 +423,50 @@ export async function fetchAndMapSleep(
 
     const rawPoints: Array<{ startMs: number; endMs: number; stage: number }> = [];
 
+    // Query in 30-day chunks (Google Fit enforces maximum dataset query window)
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+    const windows = [
+      { start: endMs - THIRTY_DAYS, end: endMs },
+      { start: endMs - 2 * THIRTY_DAYS, end: endMs - THIRTY_DAYS },
+    ];
+
     for (const sourceId of sleepSources) {
-      try {
-        const datasetId = `${startMs}000000-${endMs}000000`;
-        const rawRes = await fetch(
-          `https://www.googleapis.com/fitness/v1/users/me/dataSources/${encodeURIComponent(sourceId)}/datasets/${datasetId}`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
+      for (const win of windows) {
+        try {
+          const datasetId = `${win.start}000000-${win.end}000000`;
+          const rawRes = await fetch(
+            `https://www.googleapis.com/fitness/v1/users/me/dataSources/${encodeURIComponent(sourceId)}/datasets/${datasetId}`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          );
 
-        if (rawRes.ok) {
-          const rawData = (await rawRes.json()) as {
-            point?: {
-              startTimeNanos?: string;
-              endTimeNanos?: string;
-              value?: Array<{ intVal?: number }>;
-            }[];
-          };
+          if (rawRes.ok) {
+            const rawData = (await rawRes.json()) as {
+              point?: {
+                startTimeNanos?: string;
+                endTimeNanos?: string;
+                value?: Array<{ intVal?: number }>;
+              }[];
+            };
 
-          for (const point of rawData.point ?? []) {
-            if (!point.startTimeNanos || !point.endTimeNanos) continue;
-            const pStart = Number(BigInt(point.startTimeNanos) / BigInt(1_000_000));
-            const pEnd = Number(BigInt(point.endTimeNanos) / BigInt(1_000_000));
-            const stage = point.value?.[0]?.intVal ?? 2;
-            if (pEnd > pStart) {
-              rawPoints.push({ startMs: pStart, endMs: pEnd, stage });
+            for (const point of rawData.point ?? []) {
+              if (!point.startTimeNanos || !point.endTimeNanos) continue;
+              const pStart = Number(BigInt(point.startTimeNanos) / BigInt(1_000_000));
+              const pEnd = Number(BigInt(point.endTimeNanos) / BigInt(1_000_000));
+              const stage = point.value?.[0]?.intVal ?? 2;
+
+              // If activity segment, 72 is sleep; if sleep segment, 1 is awake and 3 is out-of-bed
+              const isSleep = sourceId.includes("activity")
+                ? stage === 72
+                : (stage !== 1 && stage !== 3);
+
+              if (isSleep && pEnd > pStart) {
+                rawPoints.push({ startMs: pStart, endMs: pEnd, stage });
+              }
             }
           }
+        } catch (e) {
+          console.error(`[GFit Sleep] Raw dataset fetch error for ${sourceId}:`, e);
         }
-      } catch (e) {
-        console.error(`[GFit Sleep] Raw dataset fetch error for ${sourceId}:`, e);
       }
     }
 
@@ -608,9 +629,12 @@ export async function fetchAndMapNutrition(
       5: "snack",
     };
 
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+    const nutritionStart = Math.max(startMs, endMs - THIRTY_DAYS);
+
     for (const sourceId of nutritionSources) {
       try {
-        const datasetId = `${startMs}000000-${endMs}000000`;
+        const datasetId = `${nutritionStart}000000-${endMs}000000`;
         const rawRes = await fetch(
           `https://www.googleapis.com/fitness/v1/users/me/dataSources/${encodeURIComponent(sourceId)}/datasets/${datasetId}`,
           { headers: { Authorization: `Bearer ${accessToken}` } }
