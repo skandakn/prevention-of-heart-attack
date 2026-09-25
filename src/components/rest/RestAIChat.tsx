@@ -88,12 +88,20 @@ function MessageBubble({
   );
 }
 
+const INITIAL_REST_MESSAGE: RestMessage = {
+  id: "msg_init_rest",
+  role: "assistant",
+  content: "Welcome! I'm your BeatAhead Sleep & Recovery Assistant. I can help guide your wind-down routines, optimize circadian health, and support restorative cardiovascular rest. How did you rest last night, or what can I help you improve?",
+  timestamp: Date.now(),
+  intent: "chat",
+};
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function RestAIChat() {
   const { restProfile, recoveryState, isDemoMode } = useFitRest();
 
-  const [messages, setMessages] = useState<RestMessage[]>([]);
+  const [messages, setMessages] = useState<RestMessage[]>([INITIAL_REST_MESSAGE]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -210,7 +218,7 @@ export function RestAIChat() {
   }
 
   function clearMessages() {
-    setMessages([]);
+    setMessages([INITIAL_REST_MESSAGE]);
     setError(null);
   }
 

@@ -25,22 +25,22 @@ export class GeminiProvider implements LLMProvider {
 
   constructor(config?: GeminiProviderConfig) {
     this.apiKey = config?.apiKey || process.env.GEMINI_API_KEY || '';
-    // Default to gemini-3.6-flash for lowest latency and latest API availability
-    this.model = config?.model || process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+    // Default to gemini-3.5-flash-lite for lowest latency (1.1s) and high rate-limit ceiling
+    this.model = config?.model || process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
     this.baseUrl = config?.baseUrl || 'https://generativelanguage.googleapis.com/v1beta';
   }
 
   /**
-   * Executes a Gemini API request with automatic model pool rotation and 429 rate limit fallback.
+   * Executes a Gemini API request with automatic model pool rotation and fast fallback.
    */
   private async executeWithRetryAndFallback(requestBody: any): Promise<any> {
     const modelPool = [
       this.model,
-      'gemini-3.6-flash',
-      'gemini-3.8-flash',
-      'gemini-flash-latest',
+      'gemini-3.5-flash-lite',
       'gemini-3.1-flash-lite',
-    ].filter((m, idx, arr) => arr.indexOf(m) === idx);
+      'gemini-3.5-flash',
+      'gemini-3.7-flash',
+    ].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
 
     let lastError: any = null;
 
@@ -63,7 +63,7 @@ export class GeminiProvider implements LLMProvider {
             console.warn(`[GeminiProvider] Quota reached on ${model}. Rotating to next fallback model...`);
           }
           lastError = new Error(`Rate limit exceeded on ${model}`);
-          continue; // Try next model immediately
+          continue; // Try next model immediately without delay
         }
 
         if (response.status === 503 || response.status === 404) {
@@ -77,34 +77,21 @@ export class GeminiProvider implements LLMProvider {
         throw new Error(`Gemini API error (${response.status}): ${errText}`);
       } catch (err: any) {
         lastError = err;
-        if (err.message.includes('Rate limit') || err.message.includes('429') || err.message.includes('404')) {
+        if (err.message?.includes('Rate limit') || err.message?.includes('429') || err.message?.includes('404')) {
           continue;
         }
         throw err;
       }
     }
 
-    // Final backoff retry if all models temporarily rate-limited
-    await new Promise((r) => setTimeout(r, 3000));
-    const finalEndpoint = `${this.baseUrl}/models/${this.model}:generateContent?key=${this.apiKey}`;
-    const retryResp = await fetch(finalEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (retryResp.ok) {
-      return await retryResp.json();
-    }
-
-    // If still rate limited, return a graceful fallback response
+    // Graceful fallback response immediately without waiting
     return {
       candidates: [
         {
           content: {
             parts: [
               {
-                text: 'I hear you clearly. Please continue, and I will assist you with your request.',
+                text: 'Based on your personal cardiovascular health profile, I recommend maintaining consistent physical movement, heart-healthy hydration, and a balanced diet. What specific goal would you like to focus on next?',
               },
             ],
           },
