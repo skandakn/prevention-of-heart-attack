@@ -20,8 +20,6 @@ import {
   BookOpen,
   Info,
   CreditCard,
-  PhoneCall,
-  FileText,
   HeartPulse,
   LogIn,
 } from "lucide-react";
@@ -47,8 +45,6 @@ function useIsOnboarding(pathname: string): boolean {
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/helpline", label: "Cardiac Helpline", icon: PhoneCall },
-  { href: "/calls", label: "Call Records", icon: FileText },
   { href: "/health-record", label: "Health Record", icon: HeartPulse },
   { href: "/signals", label: "Signals", icon: Activity },
   { href: "/trends", label: "Trends", icon: BarChart3 },
