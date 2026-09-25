@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { useSubscription } from "@/lib/subscription/SubscriptionContext";
 import { NutriProvider } from "@/lib/nutri/NutriContext";
+import { FitRestProvider } from "@/lib/fit-rest/FitRestContext";
 
 import { Paywall } from "@/components/ui/Paywall";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -12,7 +13,8 @@ import { NutriProfileForm } from "@/components/nutri/NutriProfileForm";
 import { DailyPlan } from "@/components/nutri/DailyPlan";
 import { SmartRecommendations } from "@/components/nutri/SmartRecommendations";
 import { NutriReport } from "@/components/nutri/NutriReport";
-import { Sparkles, FileText } from "lucide-react";
+import { GoogleFitSync } from "@/components/fitness/GoogleFitSync";
+import { Sparkles, FileText, Activity } from "lucide-react";
 import type { NutriISIContext } from "@/lib/nutri/types";
 
 // ─── Inner page (inside NutriProvider) ───────────────────────────────────────
@@ -41,6 +43,15 @@ function NutriAgentInner() {
         <p className="text-sm text-navy-500">
           Personalized nutrition guidance based on your wellness patterns.
         </p>
+      </div>
+
+      {/* ── Connect Google Fit ──────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Activity className="h-5 w-5 text-navy-600" />
+          <h2 className="text-lg font-semibold text-navy-900">Connect Google Fit</h2>
+        </div>
+        <GoogleFitSync />
       </div>
 
       {/* ── Tabs ──────────────────────────────────────────────────────── */}
@@ -116,9 +127,11 @@ export default function NutriAgentPage() {
   const hasAccess = canAccessFeature("AI_INSIGHTS");
 
   const content = (
-    <NutriProvider>
-      <NutriAgentInner />
-    </NutriProvider>
+    <FitRestProvider>
+      <NutriProvider>
+        <NutriAgentInner />
+      </NutriProvider>
+    </FitRestProvider>
   );
 
   if (!hasAccess) {
