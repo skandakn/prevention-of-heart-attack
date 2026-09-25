@@ -91,7 +91,7 @@ function MessageBubble({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function FitnessAIChat() {
-  const { fitnessProfile, recoveryState, isDemoMode, workoutHistory } = useFitRest();
+  const { fitnessProfile, recoveryState, workoutHistory } = useFitRest();
 
   const [messages, setMessages] = useState<FitnessMessage[]>([]);
   const [input, setInput] = useState("");
@@ -226,12 +226,6 @@ export function FitnessAIChat() {
           <p className="text-[11px] text-navy-400">
             Informational wellness guidance — not medical or training advice.
           </p>
-          {isDemoMode && (
-            <p className="text-[10px] text-amber-600 font-medium">
-              ⚠️ Activity data is in demo mode. AI suggestions are based on your
-              profile.
-            </p>
-          )}
         </div>
       </CardHeader>
 

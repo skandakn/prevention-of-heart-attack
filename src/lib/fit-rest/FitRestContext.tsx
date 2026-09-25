@@ -21,8 +21,6 @@ import {
   STORAGE_KEYS,
 } from "./types";
 import {
-  generateDemoWorkoutHistory,
-  generateDemoSleepHistory,
   computeRecoveryState,
 } from "./demo-data";
 
@@ -109,50 +107,37 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
         setRestProfile((prev) => ({ ...prev, ...parsed }));
       }
 
-      // Load workout history (or generate demo data)
+      // Load workout history — start empty if none stored or if all entries are demo data
       const storedWorkouts = localStorage.getItem(STORAGE_KEYS.WORKOUT_HISTORY);
       if (storedWorkouts) {
-        const parsed = JSON.parse(storedWorkouts) as WorkoutSession[];
-        // Only use stored data if it's a non-empty array
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setWorkoutHistory(parsed);
-        } else {
-          // Empty array or invalid data - initialize with demo data
-          const demoWorkouts = generateDemoWorkoutHistory();
-          setWorkoutHistory(demoWorkouts);
-          localStorage.setItem(
-            STORAGE_KEYS.WORKOUT_HISTORY,
-            JSON.stringify(demoWorkouts)
-          );
+        try {
+          const parsed = JSON.parse(storedWorkouts) as WorkoutSession[];
+          if (Array.isArray(parsed)) {
+            // Strip out any demo/synthetic entries — only keep real data
+            const real = parsed.filter((w) => !w.isDemoData);
+            setWorkoutHistory(real);
+            // Persist stripped list back so demo entries don't re-appear on reload
+            localStorage.setItem(STORAGE_KEYS.WORKOUT_HISTORY, JSON.stringify(real));
+          }
+        } catch {
+          setWorkoutHistory([]);
         }
-      } else {
-        // Initialize with demo data
-        const demoWorkouts = generateDemoWorkoutHistory();
-        setWorkoutHistory(demoWorkouts);
-        localStorage.setItem(
-          STORAGE_KEYS.WORKOUT_HISTORY,
-          JSON.stringify(demoWorkouts)
-        );
       }
 
-      // Load sleep history (or generate demo data)
+      // Load sleep history — start empty if none stored or if all entries are demo data
       const storedSleep = localStorage.getItem(STORAGE_KEYS.SLEEP_HISTORY);
       if (storedSleep) {
-        const parsed = JSON.parse(storedSleep) as SleepSession[];
-        // Only use stored data if it's a non-empty array
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setSleepHistory(parsed);
-        } else {
-          // Empty array or invalid data - initialize with demo data
-          const demoSleep = generateDemoSleepHistory();
-          setSleepHistory(demoSleep);
-          localStorage.setItem(STORAGE_KEYS.SLEEP_HISTORY, JSON.stringify(demoSleep));
+        try {
+          const parsed = JSON.parse(storedSleep) as SleepSession[];
+          if (Array.isArray(parsed)) {
+            // Strip out any demo/synthetic entries — only keep real data
+            const real = parsed.filter((s) => !s.isDemoData);
+            setSleepHistory(real);
+            localStorage.setItem(STORAGE_KEYS.SLEEP_HISTORY, JSON.stringify(real));
+          }
+        } catch {
+          setSleepHistory([]);
         }
-      } else {
-        // Initialize with demo data
-        const demoSleep = generateDemoSleepHistory();
-        setSleepHistory(demoSleep);
-        localStorage.setItem(STORAGE_KEYS.SLEEP_HISTORY, JSON.stringify(demoSleep));
       }
 
       // ── Load Google Fit token (if previously connected) ───────────────────
@@ -417,10 +402,12 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.removeItem(GFIT_TOKEN_KEY);
       localStorage.removeItem(GFIT_SYNCED_KEY);
-      // Remove imported workouts and replace with demo data
-      const demoWorkouts = generateDemoWorkoutHistory();
-      setWorkoutHistory(demoWorkouts);
-      localStorage.setItem(STORAGE_KEYS.WORKOUT_HISTORY, JSON.stringify(demoWorkouts));
+      // Remove only Google Fit imported workouts, keep manual entries
+      setWorkoutHistory((prev) => {
+        const manual = prev.filter((w) => !w.id.startsWith("gfit_"));
+        localStorage.setItem(STORAGE_KEYS.WORKOUT_HISTORY, JSON.stringify(manual));
+        return manual;
+      });
     } catch {/* ignore */}
   }, []);
 

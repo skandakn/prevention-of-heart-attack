@@ -10,14 +10,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { DisclaimerBanner } from "@/components/layout/Footer";
 import { SimulatedBadge } from "@/components/layout/Toast";
-import { Dumbbell, CheckCircle2, Calendar, TrendingUp, Clock, Target, Activity, History, Award, AlertCircle } from "lucide-react";
+import { Dumbbell, CheckCircle2, Calendar, TrendingUp, Clock, Target, Activity, History, Award } from "lucide-react";
 import { EXERCISE_TYPE_LABELS } from "@/lib/fit-rest/types";
 import { cn } from "@/lib/utils";
 
 // ─── Inner page component (inside FitRestProvider) ────────────────────────────
 
 function FitnessPageInner() {
-  const { workoutHistory, fitnessProfile, recoveryState, isDemoMode } = useFitRest();
+  const { workoutHistory, fitnessProfile, recoveryState } = useFitRest();
 
   // Get today's or most recent workout
   const todaysWorkout = workoutHistory.length > 0 ? workoutHistory[0] : null;
@@ -62,26 +62,6 @@ function FitnessPageInner() {
 
       {/* ── Disclaimer ────────────────────────────────────────────────── */}
       <DisclaimerBanner />
-
-      {/* ── Demo Mode Warning ─────────────────────────────────────────── */}
-      {isDemoMode && (
-        <Card className="border-amber-200 bg-amber-50/50">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs font-semibold text-amber-700 mb-1">
-                  Demo Mode — Simulated Activity Data
-                </p>
-                <p className="text-xs text-amber-600 leading-relaxed">
-                  This workout data is simulated for demonstration purposes.
-                  Complete your profile to track real workout data.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* ── Fitness Overview Section ──────────────────────────────────── */}
       <div className="space-y-3">
@@ -324,25 +304,6 @@ function FitnessPageInner() {
                   </p>
                 </CardContent>
               </Card>
-
-              {isDemoMode && (
-                <Card className="border-amber-200 bg-amber-50/50">
-                  <CardContent className="pt-6">
-                    <div className="flex items-start gap-2">
-                      <Dumbbell className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-xs font-semibold text-amber-700 mb-1">
-                          Demo Mode Active
-                        </p>
-                        <p className="text-xs text-amber-600 leading-relaxed">
-                          This workout data is simulated for demonstration purposes.
-                          Complete your profile to get personalized recommendations.
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
             </div>
           </div>
         ) : (
@@ -350,10 +311,10 @@ function FitnessPageInner() {
             <CardContent className="py-12 text-center">
               <Dumbbell className="h-12 w-12 text-navy-300 mx-auto mb-3" />
               <p className="text-sm font-medium text-navy-700 mb-1">
-                No workout planned for today
+                No workouts recorded yet
               </p>
               <p className="text-xs text-navy-500">
-                Complete your fitness profile to get personalized workout recommendations.
+                Connect Google Fit below to import your real workouts, or complete your fitness profile to get started.
               </p>
             </CardContent>
           </Card>
@@ -410,11 +371,6 @@ function FitnessPageInner() {
                                 day: "numeric"
                               })}
                             </span>
-                            {workout.isDemoData && (
-                              <span className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 uppercase tracking-wide">
-                                Demo
-                              </span>
-                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -480,11 +436,6 @@ function FitnessPageInner() {
                           <p className="text-sm font-semibold text-navy-900 truncate">
                             {EXERCISE_TYPE_LABELS[workout.type]}
                           </p>
-                          {workout.isDemoData && (
-                            <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 uppercase tracking-wide shrink-0">
-                              Demo
-                            </span>
-                          )}
                         </div>
                         <p className="text-xs text-navy-500">
                           {new Date(workout.date).toLocaleDateString("en-US", { 

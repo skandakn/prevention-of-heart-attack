@@ -49,32 +49,13 @@ function getAverageWakeTime(sleepHistory: any[], fallback: string): string {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function SleepOverview() {
-  const { sleepHistory, restProfile, recoveryState, isDemoMode } = useFitRest();
+  const { sleepHistory, restProfile, recoveryState } = useFitRest();
 
   const avgBedtime = getAverageBedtime(sleepHistory, restProfile.typicalBedtime);
   const avgWakeTime = getAverageWakeTime(sleepHistory, restProfile.typicalWakeTime);
 
   return (
     <div className="space-y-4">
-      {/* Demo mode indicator */}
-      {isDemoMode && (
-        <Card className="border-amber-200 bg-amber-50/50">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs font-semibold text-amber-700 mb-1">
-                  Demo Mode — Simulated Sleep Data
-                </p>
-                <p className="text-xs text-amber-600 leading-relaxed">
-                  This sleep data is simulated for demonstration purposes. Complete your rest profile to track real sleep patterns.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Sleep Overview Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Average sleep duration */}

@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { EXERCISE_TYPE_LABELS } from "@/lib/fit-rest/types";
 import type { WorkoutSession, ExerciseType, WorkoutIntensity } from "@/lib/fit-rest/types";
-import { Clock, Dumbbell, TrendingUp, Zap, AlertCircle } from "lucide-react";
+import { Clock, Dumbbell, TrendingUp, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ─── Extended Exercise Detail (for detailed workout plans) ────────────────────
@@ -87,7 +87,6 @@ export function WorkoutPlanCard({
   className,
 }: WorkoutPlanCardProps) {
   const isDetailed = isDetailedPlan(workout);
-  const isDemoData = "isDemoData" in workout ? workout.isDemoData : false;
 
   const totalDuration = isDetailed
     ? workout.estimatedTotalMinutes || workout.durationMinutes
@@ -129,15 +128,8 @@ export function WorkoutPlanCard({
           </div>
         </div>
 
-        {/* Demo indicator */}
-        {isDemoData && (
-          <div className="flex items-center gap-1.5 mt-2 rounded-md bg-amber-50 border border-amber-200 px-2.5 py-1.5">
-            <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-            <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wide">
-              Demo Mode — Simulated Data
-            </p>
-          </div>
-        )}
+        {/* Actions */}
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-4">

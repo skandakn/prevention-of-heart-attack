@@ -91,7 +91,7 @@ function MessageBubble({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function RestAIChat() {
-  const { restProfile, recoveryState, isDemoMode } = useFitRest();
+  const { restProfile, recoveryState } = useFitRest();
 
   const [messages, setMessages] = useState<RestMessage[]>([]);
   const [input, setInput] = useState("");
@@ -241,12 +241,6 @@ export function RestAIChat() {
           <p className="text-[11px] text-navy-400">
             Informational wellness guidance — not medical advice.
           </p>
-          {isDemoMode && (
-            <p className="text-[10px] text-amber-600 font-medium">
-              ⚠️ Sleep/activity data is in demo mode. AI suggestions are based on
-              your profile and simulated recovery data.
-            </p>
-          )}
         </div>
       </CardHeader>
 

@@ -2,7 +2,7 @@
 
 import { useFitRest } from "@/lib/fit-rest/FitRestContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Moon, Clock, Sun, AlertCircle, History } from "lucide-react";
+import { Moon, Clock, Sun, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ─── Helper Functions ─────────────────────────────────────────────────────────
@@ -29,7 +29,7 @@ function formatDate(dateString: string): string {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function SleepHistory() {
-  const { sleepHistory, isDemoMode } = useFitRest();
+  const { sleepHistory } = useFitRest();
 
   return (
     <Card>
@@ -57,39 +57,19 @@ export function SleepHistory() {
           </div>
         )}
 
-        {/* Demo mode indicator */}
-        {isDemoMode && sleepHistory.length > 0 && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2 mb-4">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-700">
-                Some or all sleep records below are simulated demo data.
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* Sleep history list */}
         {sleepHistory.length > 0 && (
           <div className="space-y-3">
             {sleepHistory.map((sleep) => (
               <div
                 key={sleep.id}
-                className={cn(
-                  "rounded-lg border p-4 transition-colors hover:bg-navy-50/50",
-                  sleep.isDemoData ? "border-amber-200 bg-amber-50/30" : "border-navy-100 bg-white"
-                )}
+                className="rounded-lg border border-navy-100 bg-white p-4 transition-colors hover:bg-navy-50/50"
               >
-                {/* Date and demo badge */}
+                {/* Date */}
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm font-semibold text-navy-900">
                     {formatDate(sleep.date)}
                   </p>
-                  {sleep.isDemoData && (
-                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 uppercase tracking-wide">
-                      Demo — Simulated
-                    </span>
-                  )}
                 </div>
 
                 {/* Sleep details grid */}
