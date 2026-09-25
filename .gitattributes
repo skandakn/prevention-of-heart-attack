@@ -1,0 +1,13 @@
+# GitHub Linguist Configuration for BeatAhead
+# Highlights the core Python Machine Learning & Signal Processing Backend
+# by marking standard UI design system primitives and framework wrappers as vendored.
+
+src/components/* linguist-vendored
+src/components/** linguist-vendored
+src/core/* linguist-vendored
+src/core/** linguist-vendored
+
+# Ensure all backend Python ML modules, pipelines, and evaluation harnesses are indexed
+backend/* linguist-detectable=true
+backend/** linguist-detectable=true
+backend/**/*.py linguist-detectable=true

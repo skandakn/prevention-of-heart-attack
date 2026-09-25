@@ -11,6 +11,7 @@ import {
   calculateCompositeISI,
   computeModelEvidence,
   computeTrendMomentum,
+  PersonalBaselineTracker,
   TAU_FROZEN,
   type EngineInput
 } from "./engine";
@@ -106,7 +107,15 @@ export function calculateISI(input: ScoringInput): ISIScore {
     recentIsiHistory: historicalScores,
   };
 
-  const output = calculateCompositeISI(engineInput);
+  const tracker = new PersonalBaselineTracker({
+    restingHR: baseline.restingHR,
+    sdnn: baseline.hrv,
+    spo2: baseline.spo2,
+    pat: 225.0,
+    isi: baseline.isi,
+  });
+
+  const output = calculateCompositeISI(engineInput, tracker);
 
   const trend = calculateTrend(output.isi, historicalScores);
   const confidence = Math.round(

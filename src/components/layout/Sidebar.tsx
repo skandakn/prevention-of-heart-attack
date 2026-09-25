@@ -30,7 +30,6 @@ import { cn } from "@/lib/utils";
 import { useSubscription } from "@/lib/subscription/SubscriptionContext";
 import { useTour } from "@/lib/tour/TourContext";
 import { useState, useEffect } from "react";
-import { DemoModePanel } from "./DemoModePanel";
 import { SystemStatusPanel } from "./SystemStatusPanel";
 import { SettingsButton } from "./SettingsPanel";
 import { Button } from "@/components/ui/button";
@@ -53,7 +52,6 @@ const navItems = [
   { href: "/helpline", label: "Cardiac Helpline", icon: PhoneCall },
   { href: "/calls", label: "Call Records", icon: FileText },
   { href: "/health-record", label: "Health Record", icon: HeartPulse },
-  { href: "/monitor", label: "Live Monitor", icon: Radio },
   { href: "/signals", label: "Signals", icon: Activity },
   { href: "/trends", label: "Trends", icon: BarChart3 },
   { href: "/insights", label: "AI Insights", icon: Brain },
@@ -91,7 +89,7 @@ export function Sidebar() {
           
           // Add tour IDs for specific nav items
           let tourId: string | undefined;
-          if (item.href === "/monitor") tourId = "nav-monitor";
+          if (item.href === "/health-record") tourId = "nav-health-record";
           if (item.href === "/signals") tourId = "nav-signals";
           
           // Check if we need to start wellness agents wrapper
@@ -171,7 +169,6 @@ export function Sidebar() {
 
       <div className="p-4 space-y-3 border-t border-navy-100">
         <SystemStatusPanel compact />
-        <DemoModePanel compact />
         <SidebarSignOutButton />
         <div className="flex items-center justify-between px-1 pt-1">
           <span className="text-xs text-navy-500">Settings</span>
@@ -278,7 +275,6 @@ export function MobileNav() {
             </nav>
             <div className="mt-6 space-y-3">
               <SystemStatusPanel />
-              <DemoModePanel />
               <div className="flex items-center justify-between px-1 pt-2 border-t border-navy-100">
                 <span className="text-xs text-navy-500">Settings</span>
                 <SettingsButton />
@@ -301,8 +297,7 @@ export function AppHeader() {
   if (isLanding || isAuthPage || isOnboarding) return null;
 
   const titles: Record<string, string> = {
-    "/dashboard": "Live Physiological Monitoring",
-    "/monitor": "Live Signal Monitoring",
+    "/dashboard": "Cardiovascular Health Dashboard",
     "/signals": "Feature Analysis",
     "/trends": "Long-term Trends",
     "/insights": "AI Insights",
@@ -327,11 +322,6 @@ export function AppHeader() {
           {titles[pathname] || "BeatAhead"}
         </h2>
         <div className="flex items-center gap-2 sm:gap-3">
-          <HeaderProStatusBadge />
-          <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-medium border border-amber-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-            Simulated Data
-          </span>
           <SettingsButton />
 
           <div className="ml-1 pl-2 border-l border-navy-200 flex items-center">

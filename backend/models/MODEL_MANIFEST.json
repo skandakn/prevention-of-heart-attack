@@ -1,0 +1,21 @@
+{
+  "manifest_version": "1.0.0",
+  "created_at": "2026-09-22 13:52:19 UTC",
+  "artifacts": {
+    "beatahead_phase5_model.joblib": {
+      "path": "models/beatahead_phase5_model.joblib",
+      "size_bytes": 43693,
+      "sha256": "528ff3f8f5edac6f3baf5aef8715d5e86f478462d76ac574b9f0ec60e8640808"
+    },
+    "feature_schema.json": {
+      "path": "models/feature_schema.json",
+      "size_bytes": 6940,
+      "sha256": "49f52c07ef101114cad596e74e843b740dbf633063ca386a29221688da7be4ff"
+    },
+    "model_metadata.json": {
+      "path": "models/model_metadata.json",
+      "size_bytes": 5291,
+      "sha256": "4215aa68ad49ab69c68d602822ee018b1521413b977cc0aabbb7eba51eeb78a2"
+    }
+  }
+}

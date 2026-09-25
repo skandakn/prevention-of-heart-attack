@@ -7,8 +7,7 @@ import { Paywall } from "@/components/ui/Paywall";
 import { generateTrendData } from "@/lib/isi/simulation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DisclaimerBanner } from "@/components/layout/Footer";
-import { SimulatedBadge } from "@/components/layout/Toast";
+
 import {
   ResponsiveContainer,
   LineChart,
@@ -54,15 +53,10 @@ export default function TrendsPage() {
 
   const content = (
     <div className="p-4 lg:p-8 space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-navy-900">Long-term Trends</h1>
-          <p className="text-sm text-navy-500">Historical physiological pattern analysis</p>
-        </div>
-        <SimulatedBadge />
+      <div>
+        <h1 className="text-2xl font-bold text-navy-900">Long-term Trends</h1>
+        <p className="text-sm text-navy-500">Historical physiological pattern analysis</p>
       </div>
-
-      <DisclaimerBanner />
 
       <Tabs value={filter} onValueChange={setFilter}>
         <TabsList>

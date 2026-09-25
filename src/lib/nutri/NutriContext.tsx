@@ -39,9 +39,17 @@ const NutriContext = createContext<NutriContextValue | null>(null);
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
+const INITIAL_NUTRI_MESSAGE: NutriMessage = {
+  id: "msg_init_nutri",
+  role: "assistant",
+  content: "Hello! I'm your BeatAhead Nutrition Assistant. I'm here to provide heart-healthy dietary guidance, meal planning, and nutrition insights tailored to your cardiovascular health profile. What can I help you with today?",
+  timestamp: Date.now(),
+  intent: "chat",
+};
+
 export function NutriProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<NutriProfile>(DEFAULT_NUTRI_PROFILE);
-  const [messages, setMessages] = useState<NutriMessage[]>([]);
+  const [messages, setMessages] = useState<NutriMessage[]>([INITIAL_NUTRI_MESSAGE]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -160,7 +168,7 @@ export function NutriProvider({ children }: { children: React.ReactNode }) {
     [] // stable — all mutable state read via refs
   );
 
-  const clearMessages = useCallback(() => setMessages([]), []);
+  const clearMessages = useCallback(() => setMessages([INITIAL_NUTRI_MESSAGE]), []);
   const clearError = useCallback(() => setError(null), []);
 
   return (

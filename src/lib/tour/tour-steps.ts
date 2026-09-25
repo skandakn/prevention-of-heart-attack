@@ -16,9 +16,9 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     id: 2,
-    target: "[data-tour-id='nav-monitor']",
-    title: "Live Monitor",
-    description: "Explore the simulated physiological monitoring experience and follow the available signal streams.",
+    target: "[data-tour-id='nav-health-record']",
+    title: "My Health Record",
+    description: "Input and view your clinical vitals, blood pressure, resting heart rate, and cardiovascular history.",
     position: "right",
   },
   {

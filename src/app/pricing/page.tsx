@@ -3,8 +3,7 @@
 import { Check, Sparkles, Building2, UserCheck, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSubscription } from "@/lib/subscription/SubscriptionContext";
-import { DisclaimerBanner, Footer } from "@/components/layout/Footer";
-import { SimulatedBadge } from "@/components/layout/Toast";
+
 
 export default function PricingPage() {
   const { subscriptionStatus, demoMode, subscribeToPro, setDemoMode, isLoading } = useSubscription();
@@ -13,17 +12,12 @@ export default function PricingPage() {
 
   return (
     <div className="p-4 lg:p-8 space-y-8 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold text-navy-900">Pricing & Subscription Plans</h1>
-          <p className="text-sm text-navy-500 mt-1">
-            Choose the right plan for your physiological research and monitoring needs.
-          </p>
-        </div>
-        <SimulatedBadge />
+      <div>
+        <h1 className="text-3xl font-bold text-navy-900">Pricing & Subscription Plans</h1>
+        <p className="text-sm text-navy-500 mt-1">
+          Choose the right plan for your physiological research and monitoring needs.
+        </p>
       </div>
-
-      <DisclaimerBanner />
 
       <div className="grid md:grid-cols-3 gap-8 pt-4">
         {/* Free Plan */}

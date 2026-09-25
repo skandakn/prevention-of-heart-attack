@@ -88,12 +88,20 @@ function MessageBubble({
   );
 }
 
+const INITIAL_FITNESS_MESSAGE: FitnessMessage = {
+  id: "msg_init_fitness",
+  role: "assistant",
+  content: "Hi! I'm your BeatAhead Fitness Coach. I can create customized cardiovascular workout sessions, guide heart-safe physical activity, and help you reach your movement goals. What workout or fitness question would you like to explore?",
+  timestamp: Date.now(),
+  intent: "chat",
+};
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function FitnessAIChat() {
   const { fitnessProfile, recoveryState, workoutHistory } = useFitRest();
 
-  const [messages, setMessages] = useState<FitnessMessage[]>([]);
+  const [messages, setMessages] = useState<FitnessMessage[]>([INITIAL_FITNESS_MESSAGE]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -195,7 +203,7 @@ export function FitnessAIChat() {
   }
 
   function clearMessages() {
-    setMessages([]);
+    setMessages([INITIAL_FITNESS_MESSAGE]);
     setError(null);
   }
 

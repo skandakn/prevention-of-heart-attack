@@ -1,0 +1,295 @@
+{
+  "schema_name": "BeatAhead_Matrix_A_Feature_Schema",
+  "schema_version": "1.0.0",
+  "feature_count": 26,
+  "feature_order": [
+    "ecg_hr_mean",
+    "ecg_hr_std",
+    "ecg_rr_sdnn",
+    "ecg_rr_rmssd",
+    "ecg_pnn50",
+    "ecg_r_amp_mv",
+    "ecg_qrs_width_ms",
+    "ecg_sqi",
+    "pat_median_ms",
+    "pat_iqr_ms",
+    "pat_valid_fraction",
+    "pat_valid",
+    "ppg_pulse_amp",
+    "ppg_perfusion_index",
+    "ppg_crest_time_ms",
+    "ppg_sqi",
+    "spo2_mean",
+    "spo2_min",
+    "spo2_std",
+    "spo2_desat_count",
+    "st_obs_mean",
+    "st_obs_median",
+    "st_obs_min",
+    "st_obs_std",
+    "st_delta_baseline",
+    "st_slope_mm_min"
+  ],
+  "features": {
+    "ecg_hr_mean": {
+      "type": "float",
+      "modality": "ECG",
+      "unit": "bpm",
+      "bounds": [
+        20.0,
+        300.0
+      ],
+      "description": "Mean heart rate over 5-min observation window"
+    },
+    "ecg_hr_std": {
+      "type": "float",
+      "modality": "ECG",
+      "unit": "bpm",
+      "bounds": [
+        0.0,
+        150.0
+      ],
+      "description": "Standard deviation of heart rate (autonomic tone)"
+    },
+    "ecg_rr_sdnn": {
+      "type": "float",
+      "modality": "ECG",
+      "unit": "ms",
+      "bounds": [
+        0.0,
+        1000.0
+      ],
+      "description": "SDNN: Standard deviation of normal-to-normal RR intervals"
+    },
+    "ecg_rr_rmssd": {
+      "type": "float",
+      "modality": "ECG",
+      "unit": "ms",
+      "bounds": [
+        0.0,
+        1000.0
+      ],
+      "description": "RMSSD: Root mean square of successive RR interval differences"
+    },
+    "ecg_pnn50": {
+      "type": "float",
+      "modality": "ECG",
+      "unit": "%",
+      "bounds": [
+        0.0,
+        100.0
+      ],
+      "description": "Percentage of adjacent RR intervals differing by > 50 ms"
+    },
+    "ecg_r_amp_mv": {
+      "type": "float",
+      "modality": "ECG",
+      "unit": "mV",
+      "bounds": [
+        -2.0,
+        15.0
+      ],
+      "description": "Median R-wave peak amplitude above isoelectric baseline"
+    },
+    "ecg_qrs_width_ms": {
+      "type": "float",
+      "modality": "ECG",
+      "unit": "ms",
+      "bounds": [
+        30.0,
+        300.0
+      ],
+      "description": "Estimated QRS complex duration"
+    },
+    "ecg_sqi": {
+      "type": "float",
+      "modality": "ECG",
+      "unit": "ratio",
+      "bounds": [
+        0.0,
+        1.0
+      ],
+      "description": "ECG signal quality index (clean QRS fraction)"
+    },
+    "pat_median_ms": {
+      "type": "float",
+      "modality": "ECG+PPG",
+      "unit": "ms",
+      "bounds": [
+        50.0,
+        600.0
+      ],
+      "description": "Median Pulse Arrival Time (QRS peak to PPG foot delay)"
+    },
+    "pat_iqr_ms": {
+      "type": "float",
+      "modality": "ECG+PPG",
+      "unit": "ms",
+      "bounds": [
+        0.0,
+        500.0
+      ],
+      "description": "Interquartile range of PAT (vascular compliance stability)"
+    },
+    "pat_valid_fraction": {
+      "type": "float",
+      "modality": "ECG+PPG",
+      "unit": "ratio",
+      "bounds": [
+        0.0,
+        1.0
+      ],
+      "description": "Fraction of cardiac cycles with plausible PAT (100-450 ms)"
+    },
+    "pat_valid": {
+      "type": "int",
+      "modality": "ECG+PPG",
+      "unit": "binary",
+      "bounds": [
+        0,
+        1
+      ],
+      "description": "Binary flag indicating >= 30% plausible PAT beats"
+    },
+    "ppg_pulse_amp": {
+      "type": "float",
+      "modality": "PPG",
+      "unit": "a.u.",
+      "bounds": [
+        0.0,
+        50000.0
+      ],
+      "description": "Median peak-to-trough photoplethysmogram pulse amplitude"
+    },
+    "ppg_perfusion_index": {
+      "type": "float",
+      "modality": "PPG",
+      "unit": "%",
+      "bounds": [
+        0.0,
+        10000.0
+      ],
+      "description": "Photoplethysmogram Perfusion Index (AC/DC ratio)"
+    },
+    "ppg_crest_time_ms": {
+      "type": "float",
+      "modality": "PPG",
+      "unit": "ms",
+      "bounds": [
+        20.0,
+        500.0
+      ],
+      "description": "PPG pulse foot to systolic peak crest time"
+    },
+    "ppg_sqi": {
+      "type": "float",
+      "modality": "PPG",
+      "unit": "ratio",
+      "bounds": [
+        0.0,
+        1.0
+      ],
+      "description": "PPG signal quality index (clipping and saturation detection)"
+    },
+    "spo2_mean": {
+      "type": "float",
+      "modality": "SpO2",
+      "unit": "%",
+      "bounds": [
+        40.0,
+        100.0
+      ],
+      "description": "Mean pulse oximeter oxygen saturation over 5-min window"
+    },
+    "spo2_min": {
+      "type": "float",
+      "modality": "SpO2",
+      "unit": "%",
+      "bounds": [
+        30.0,
+        100.0
+      ],
+      "description": "Nadir oxygen saturation during 5-min window"
+    },
+    "spo2_std": {
+      "type": "float",
+      "modality": "SpO2",
+      "unit": "%",
+      "bounds": [
+        0.0,
+        40.0
+      ],
+      "description": "Standard deviation of pulse oximeter saturation trend"
+    },
+    "spo2_desat_count": {
+      "type": "int",
+      "modality": "SpO2",
+      "unit": "seconds",
+      "bounds": [
+        0,
+        300
+      ],
+      "description": "Total duration of desaturation (SpO2 <= 90%) in seconds"
+    },
+    "st_obs_mean": {
+      "type": "float",
+      "modality": "ST_II",
+      "unit": "mm",
+      "bounds": [
+        -15.0,
+        15.0
+      ],
+      "description": "Mean ST segment level in Lead II over observation window"
+    },
+    "st_obs_median": {
+      "type": "float",
+      "modality": "ST_II",
+      "unit": "mm",
+      "bounds": [
+        -15.0,
+        15.0
+      ],
+      "description": "Median ST segment level in Lead II over observation window"
+    },
+    "st_obs_min": {
+      "type": "float",
+      "modality": "ST_II",
+      "unit": "mm",
+      "bounds": [
+        -15.0,
+        15.0
+      ],
+      "description": "Minimum ST segment level in Lead II over observation window"
+    },
+    "st_obs_std": {
+      "type": "float",
+      "modality": "ST_II",
+      "unit": "mm",
+      "bounds": [
+        0.0,
+        15.0
+      ],
+      "description": "Standard deviation of ST segment level in Lead II"
+    },
+    "st_delta_baseline": {
+      "type": "float",
+      "modality": "ST_II",
+      "unit": "mm",
+      "bounds": [
+        -15.0,
+        15.0
+      ],
+      "description": "ST median shift relative to initial 10-minute surgical baseline"
+    },
+    "st_slope_mm_min": {
+      "type": "float",
+      "modality": "ST_II",
+      "unit": "mm/min",
+      "bounds": [
+        -20.0,
+        20.0
+      ],
+      "description": "Linear regression slope of ST deviation over observation window"
+    }
+  }
+}

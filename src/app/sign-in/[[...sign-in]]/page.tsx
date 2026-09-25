@@ -23,9 +23,10 @@ export default function SignInPage() {
   const [showClerk, setShowClerk] = useState(false);
 
   const googleAccounts = [
-    { name: "Skanda K N", email: "skandakn13@gmail.com", avatar: "S", bg: "bg-emerald-700" },
-    { name: "Skanda K N", email: "knskanda68@gmail.com", avatar: "S", bg: "bg-slate-600" },
-    { name: "Shobhaskanda", email: "shobhaskanda5@gmail.com", avatar: "S", bg: "bg-sky-600" },
+    { name: "Skanda K N", email: "skandakn13@gmail.com", avatar: "S", bg: "bg-emerald-700", isPro: true },
+    { name: "Chirag S", email: "schiru330@gmail.com", avatar: "C", bg: "bg-indigo-700", isPro: true },
+    { name: "Skanda K N", email: "knskanda68@gmail.com", avatar: "S", bg: "bg-slate-600", isPro: false },
+    { name: "Shobhaskanda", email: "shobhaskanda5@gmail.com", avatar: "S", bg: "bg-sky-600", isPro: false },
   ];
 
   const handleSelectGoogleAccount = (acc: { name: string; email: string }) => {
@@ -305,7 +306,14 @@ export default function SignInPage() {
                       {acc.avatar}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-xs text-white group-hover:text-blue-300 transition-colors truncate">{acc.name}</div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-xs text-white group-hover:text-blue-300 transition-colors truncate">{acc.name}</span>
+                        {acc.isPro && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            PRO
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[11px] text-gray-400 truncate">{acc.email}</div>
                     </div>
                   </button>

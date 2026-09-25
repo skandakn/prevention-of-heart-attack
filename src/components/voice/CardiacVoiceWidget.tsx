@@ -797,7 +797,7 @@ export function CardiacVoiceWidget() {
                     href="/helpline"
                     className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 py-2 px-3 text-[11px] font-medium text-slate-300 hover:bg-slate-800 transition-colors"
                   >
-                    Telephone Dialer & Full Screen →
+                    Open Full Screen Helpline →
                   </Link>
                 </div>
               </div>

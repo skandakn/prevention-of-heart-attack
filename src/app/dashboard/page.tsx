@@ -1,32 +1,36 @@
 "use client";
 
+import { useEffect } from "react";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { ISITrendChart } from "@/components/charts/ISITrendChart";
 import { ISIGauge } from "@/components/isi/ISIGauge";
 import { BaselineCard } from "@/components/isi/BaselineCard";
 import { RiskTrendBanner } from "@/components/isi/RiskTrendBanner";
 import { ContributionBars } from "@/components/isi/ContributionBars";
-import { DisclaimerBanner } from "@/components/layout/Footer";
-import { SimulatedBadge } from "@/components/layout/Toast";
 import { useSimulation } from "@/lib/simulation/SimulationContext";
+import { useTour } from "@/lib/tour/TourContext";
 import { ISI_RANGE_LABELS } from "@/lib/isi/types";
 import Link from "next/link";
-import { Heart, PhoneCall, FileText, CreditCard, BookOpen, Info } from "lucide-react";
+import { Heart, PhoneCall, FileText, CreditCard, BookOpen, Info, Compass } from "lucide-react";
 
 export default function DashboardPage() {
-  const { settings } = useSimulation();
+  const { settings, pauseMonitoring } = useSimulation();
+  const { startTour } = useTour();
+
+  // Dashboard always shows a stable ISI score — stop any running simulation
+  useEffect(() => {
+    pauseMonitoring();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3" data-tour-id="dashboard-header">
         <div>
           <h1 className="text-2xl font-bold text-navy-900">Dashboard</h1>
-          <p className="text-sm text-navy-500 mt-0.5">Live Physiological Monitoring</p>
+          <p className="text-sm text-navy-500 mt-0.5">Cardiovascular Risk &amp; Health Overview</p>
         </div>
-        <SimulatedBadge />
       </div>
-
-      <DisclaimerBanner />
 
       <DashboardStats />
 
@@ -82,6 +86,14 @@ export default function DashboardPage() {
               Quick Links
             </h3>
             <div className="space-y-2">
+              <button
+                type="button"
+                onClick={startTour}
+                className="flex items-center gap-2 text-sm text-navy-600 hover:text-navy-900 transition-colors"
+              >
+                <Compass className="w-3.5 h-3.5" />
+                Start Guided Tour
+              </button>
               <Link
                 href="/helpline"
                 className="flex items-center gap-2 text-sm text-navy-600 hover:text-navy-900 transition-colors"

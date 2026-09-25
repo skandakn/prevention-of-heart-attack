@@ -42,7 +42,31 @@ function ensureDirectoryExists() {
   }
 }
 
+const PREMIUM_ACCOUNTS = [
+  "skandakn13@gmail.com",
+  "schiru330@gmail.com",
+];
+
+function isWhitelistedUser(userId?: string): boolean {
+  if (!userId) return false;
+  const lower = userId.toLowerCase();
+  return (
+    PREMIUM_ACCOUNTS.some((email) => lower === email.toLowerCase()) ||
+    lower.includes("skandakn13") ||
+    lower.includes("schiru330")
+  );
+}
+
 export function getSubscription(userId: string = "demo-user-1"): UserSubscription {
+  if (isWhitelistedUser(userId)) {
+    return {
+      userId,
+      subscriptionStatus: "active",
+      subscriptionPlan: "Pro (Competition Access)",
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
   ensureDirectoryExists();
   try {
     if (fs.existsSync(STORE_FILE)) {

@@ -1,4 +1,4 @@
-import { Footer, DisclaimerBanner } from "@/components/layout/Footer";
+import { Footer } from "@/components/layout/Footer";
 import { Heart, Shield, TrendingUp, Brain, Activity } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,6 @@ export default function AboutPage() {
               <p className="text-sm text-navy-500">Ischemic Stress Index Platform</p>
             </div>
           </div>
-          <DisclaimerBanner />
         </div>
 
         <section className="space-y-4">

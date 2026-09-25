@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useSimulation } from "@/lib/simulation/SimulationContext";
-import { useSubscription } from "@/lib/subscription/SubscriptionContext";
+import { useSubscription, isPremiumAccount } from "@/lib/subscription/SubscriptionContext";
+import { useBeatAheadAuth } from "@/lib/auth/ClerkAuthWrapper";
 import { cn } from "@/lib/utils";
-import { X, Settings, ShieldCheck, CreditCard, Sparkles, RefreshCw } from "lucide-react";
+import { X, Settings, ShieldCheck, CreditCard, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface SettingsPanelProps {
@@ -12,14 +13,10 @@ interface SettingsPanelProps {
   onClose: () => void;
 }
 
-const INTERVAL_OPTIONS = [
-  { value: 1000 as const, label: "1 second" },
-  { value: 2000 as const, label: "2 seconds" },
-  { value: 5000 as const, label: "5 seconds" },
-];
-
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
-  const { settings, updateSettings, resetMonitoring } = useSimulation();
+  const { settings, updateSettings } = useSimulation();
+  const { user } = useBeatAheadAuth();
+  const isWhitelisted = isPremiumAccount(user?.email);
   const {
     subscriptionStatus,
     demoMode,
@@ -86,86 +83,69 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               <span
                 className={cn(
                   "px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider",
-                  subscriptionStatus === "active"
+                  (subscriptionStatus === "active" || isWhitelisted)
                     ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
                     : "bg-navy-100 text-navy-700"
                 )}
               >
-                {subscriptionStatus === "active" ? "PRO ✓" : "FREE USER"}
+                {isWhitelisted
+                  ? "PRO (COMPETITION ACCESS) ✓"
+                  : subscriptionStatus === "active"
+                  ? "PRO ✓"
+                  : "FREE USER"}
               </span>
             </div>
 
             <p className="text-xs text-navy-500">
-              Real Razorpay Test Mode integration (₹599/month).
+              {isWhitelisted
+                ? "Permanent competition VIP status granted. All features fully unlocked for judges."
+                : "Real Razorpay Test Mode integration (₹599/month)."}
             </p>
 
-            <div className="flex flex-col gap-2 pt-1">
-              {subscriptionStatus !== "active" ? (
-                <Button
-                  onClick={subscribeToPro}
-                  size="sm"
-                  className="w-full bg-navy-900 hover:bg-navy-800 text-white gap-2"
-                >
-                  <Sparkles className="w-4 h-4 text-amber-300" />
-                  Subscribe for ₹599/month
-                </Button>
-              ) : (
-                <Button
-                  onClick={() => setSubscriptionStatusState("inactive")}
-                  variant="outline"
-                  size="sm"
-                  className="w-full text-xs text-red-600 border-red-200 hover:bg-red-50"
-                >
-                  Simulate Subscription Cancellation
-                </Button>
-              )}
-            </div>
+            {isWhitelisted ? (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 font-medium">
+                ★ Permanent Competition Access active for <span className="font-bold">{user?.email}</span>. AI Insights, Personal Baseline, Trends, Clinician View, and Agents are permanently unlocked.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 pt-1">
+                {subscriptionStatus !== "active" ? (
+                  <Button
+                    onClick={subscribeToPro}
+                    size="sm"
+                    className="w-full bg-navy-900 hover:bg-navy-800 text-white gap-2"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-300" />
+                    Subscribe for ₹599/month
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => setSubscriptionStatusState("inactive")}
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs text-red-600 border-red-200 hover:bg-red-50"
+                  >
+                    Simulate Subscription Cancellation
+                  </Button>
+                )}
+              </div>
+            )}
           </section>
 
-          {/* Section: Simulation Settings */}
-          <section>
-            <h3 className="text-xs font-semibold uppercase text-navy-400 mb-3">Simulation Speed</h3>
-            <label className="block text-sm font-medium text-navy-700 mb-2">Update interval</label>
-            <div className="grid grid-cols-3 gap-2">
-              {INTERVAL_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => updateSettings({ updateIntervalMs: opt.value })}
-                  className={cn(
-                    "px-3 py-2 rounded-lg text-xs font-medium border transition-colors",
-                    settings.updateIntervalMs === opt.value
-                      ? "bg-navy-900 text-white border-navy-900"
-                      : "bg-white text-navy-600 border-navy-100 hover:border-navy-300"
-                  )}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </section>
-
+          {/* Section: Display Settings */}
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase text-navy-400">Display Settings</h3>
             <label className="flex items-center justify-between gap-3 cursor-pointer">
               <div>
-                <p className="text-sm font-medium text-navy-700">Auto-start monitoring</p>
-                <p className="text-[11px] text-navy-400">Begin live simulation when opening Live Monitor</p>
+                <p className="text-sm font-medium text-navy-700">Show ISI Range Guide</p>
+                <p className="text-[11px] text-navy-400">Display the 0-30, 31-60, 61-100 illustrative scale</p>
               </div>
               <input
                 type="checkbox"
-                checked={settings.autoStartMonitoring}
-                onChange={(e) => updateSettings({ autoStartMonitoring: e.target.checked })}
+                checked={settings.showRangeLabels}
+                onChange={(e) => updateSettings({ showRangeLabels: e.target.checked })}
                 className="w-4 h-4 rounded border-navy-300 text-navy-900 focus:ring-navy-500"
               />
             </label>
-          </section>
-
-          <section>
-            <h3 className="text-xs font-semibold uppercase text-navy-400 mb-3">Reset Simulation</h3>
-            <Button onClick={resetMonitoring} variant="outline" size="sm" className="w-full gap-2">
-              <RefreshCw className="w-3.5 h-3.5" />
-              Reset Simulation Data
-            </Button>
           </section>
         </div>
       </div>

@@ -71,6 +71,12 @@ export class ExotelProvider implements TelephonyProvider {
     }
 
     const callerId = from || this.phoneNumber;
+    if (callerId === '+918000000000' || callerId.includes('00000000')) {
+      throw new Error(
+        'EXOTEL_PHONE_NUMBER in .env.local is set to a placeholder (+918000000000). Please update it with your real ExoPhone virtual number from your Exotel dashboard (my.exotel.com).'
+      );
+    }
+
     const url = `${this.baseUrl}/v1/Accounts/${this.accountSid}/Calls/connect.json`;
     const authHeader = 'Basic ' + Buffer.from(`${this.apiKey}:${this.apiToken}`).toString('base64');
 
@@ -90,7 +96,19 @@ export class ExotelProvider implements TelephonyProvider {
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`Exotel createCall failed (${response.status}): ${errText}`);
+      let parsedMessage = errText;
+      try {
+        const jsonErr = JSON.parse(errText);
+        if (jsonErr.RestException?.Code === 34009 || jsonErr.RestException?.Status === 403) {
+          parsedMessage = `Exotel Permission Denied (403 / Code 34009):
+1. Ensure EXOTEL_PHONE_NUMBER is your registered Exotel ExoPhone.
+2. If your account is in Trial mode, add ${to} to 'Whitelisted Numbers' in your Exotel Dashboard (my.exotel.com).
+3. Verify that your Exotel Account SID (${this.accountSid}) matches Settings > API Settings.`;
+        } else if (jsonErr.RestException?.Message) {
+          parsedMessage = jsonErr.RestException.Message;
+        }
+      } catch {}
+      throw new Error(`Exotel call failed: ${parsedMessage}`);
     }
 
     const data = (await response.json()) as any;

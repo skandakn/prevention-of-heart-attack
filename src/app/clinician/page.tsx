@@ -6,23 +6,39 @@ import { useSubscription } from "@/lib/subscription/SubscriptionContext";
 import { Paywall } from "@/components/ui/Paywall";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DisclaimerBanner } from "@/components/layout/Footer";
-import { SimulatedBadge } from "@/components/layout/Toast";
+
 import { cn, getTrendLabel } from "@/lib/utils";
 import { ISIGauge } from "@/components/isi/ISIGauge";
 import { ContributionBars } from "@/components/isi/ContributionBars";
 import { ISITrendChart } from "@/components/charts/ISITrendChart";
 import { BaselineCard } from "@/components/isi/BaselineCard";
-import { Download, ChevronRight, Cpu } from "lucide-react";
+import { Download, ChevronRight, Cpu, FileText } from "lucide-react";
 import type { PatientRecord } from "@/lib/isi/types";
 import { MEDICAL_DISCLAIMER } from "@/lib/isi/types";
+import { generateClinicalPDF, generateCohortPDF } from "@/lib/pdf/generateClinicalReport";
 
 export default function ClinicianPage() {
   const { canAccessFeature } = useSubscription();
   const [patients] = useState<PatientRecord[]>(() => generatePatients());
   const [selected, setSelected] = useState<PatientRecord | null>(() => patients[0] ?? null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const hasAccess = canAccessFeature("ADVANCED_ANALYTICS");
+
+  const exportPDF = async () => {
+    setIsExportingPdf(true);
+    try {
+      if (selected) {
+        await generateClinicalPDF(selected);
+      } else {
+        await generateCohortPDF(patients);
+      }
+    } catch (err) {
+      console.error("Failed to generate PDF report:", err);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   const exportReport = () => {
     const report = {
@@ -59,15 +75,27 @@ export default function ClinicianPage() {
           <h1 className="text-2xl font-bold text-navy-900">Clinician Dashboard</h1>
           <p className="text-sm text-navy-500">Clinical decision support prototype</p>
         </div>
-        <div className="flex items-center gap-3">
-          <SimulatedBadge />
-          <Button onClick={exportReport} variant="outline" size="sm" className="gap-2">
-            <Download className="w-4 h-4" /> Export Report
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={exportPDF}
+            disabled={isExportingPdf}
+            size="sm"
+            className="gap-2 bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white shadow-sm font-medium"
+          >
+            <FileText className="w-4 h-4" />
+            {isExportingPdf ? "Generating PDF..." : "Export PDF"}
+          </Button>
+          <Button
+            onClick={exportReport}
+            variant="outline"
+            size="sm"
+            className="gap-2 text-navy-700 border-navy-200 hover:bg-navy-50"
+          >
+            <Download className="w-4 h-4" />
+            Export JSON
           </Button>
         </div>
       </div>
-
-      <DisclaimerBanner />
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800">
         <div>
