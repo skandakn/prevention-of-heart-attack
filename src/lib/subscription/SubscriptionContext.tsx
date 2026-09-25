@@ -32,13 +32,34 @@ declare global {
   }
 }
 
+export const PREMIUM_ACCOUNTS = [
+  "skandakn13@gmail.com",
+  "schiru330@gmail.com",
+];
+
+export function isPremiumAccount(email?: string | null): boolean {
+  if (!email) return false;
+  const clean = email.trim().toLowerCase();
+  return PREMIUM_ACCOUNTS.some((e) => e.toLowerCase() === clean);
+}
+
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
-  const { userId, isLoaded: isUserLoaded } = useBeatAheadAuth();
-  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>("inactive");
+  const { userId, user, isLoaded: isUserLoaded } = useBeatAheadAuth();
+  const isWhitelisted = isPremiumAccount(user?.email);
+
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>(() =>
+    isWhitelisted ? "active" : "inactive"
+  );
   const [demoMode, setDemoModeState] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(!isWhitelisted);
 
-
+  // Auto-upgrade whitelisted premium accounts immediately
+  useEffect(() => {
+    if (isPremiumAccount(user?.email)) {
+      setSubscriptionStatus("active");
+      setIsLoading(false);
+    }
+  }, [user?.email]);
 
   // Load demo mode from localStorage
   useEffect(() => {
@@ -54,8 +75,15 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
   // Fetch real subscription status from backend DB
   const refreshSubscriptionStatus = useCallback(async () => {
+    if (isPremiumAccount(user?.email)) {
+      setSubscriptionStatus("active");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const res = await fetch("/api/subscription/status");
+      const emailQuery = user?.email ? `?email=${encodeURIComponent(user.email)}` : "";
+      const res = await fetch(`/api/subscription/status${emailQuery}`);
       if (res.ok) {
         const data = await res.json();
         if (data.subscriptionStatus) {
@@ -67,15 +95,13 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user?.email]);
 
   useEffect(() => {
     if (isUserLoaded) {
       refreshSubscriptionStatus();
     }
   }, [isUserLoaded, userId, refreshSubscriptionStatus]);
-
-
 
   const setDemoMode = (enabled: boolean) => {
     setDemoModeState(enabled);
@@ -92,12 +118,15 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
   const canAccessFeature = useCallback(
     (feature: FeatureId | string): boolean => {
-      // Pro features unlocked if subscription is active OR Judge Demo Mode is ON
+      // 1. Permanent access for competition whitelisted premium accounts
+      if (isPremiumAccount(user?.email)) return true;
+      // 2. Pro features unlocked if subscription is active
       if (subscriptionStatus === "active") return true;
+      // 3. Pro features unlocked if Judge Demo Mode is ON
       if (demoMode === true) return true;
       return false;
     },
-    [subscriptionStatus, demoMode]
+    [subscriptionStatus, demoMode, user?.email]
   );
 
   const setSubscriptionStatusState = async (status: SubscriptionStatus) => {
