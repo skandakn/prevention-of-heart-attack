@@ -47,6 +47,7 @@ export async function POST(request: Request) {
   }
 
   let { access_token, refresh_token, expires_at } = body;
+  console.log(`[GFit Sync] Received sync request (hasToken=${!!access_token})`);
 
   if (!access_token) {
     return NextResponse.json({ error: "Missing access_token." }, { status: 400 });
@@ -132,6 +133,8 @@ export async function POST(request: Request) {
 
     // 5. Fetch nutrition values (com.google.nutrition) — requires fitness.nutrition.read scope
     const nutrition = await fetchAndMapNutrition(access_token, allTimeStart, now);
+
+    console.log(`[GFit Sync] Done: ${workouts.length} workouts, ${sleepSessions.length} sleep sessions, ${nutrition?.totalMealsCount ?? 0} meals`);
 
     return NextResponse.json({
       success: true,

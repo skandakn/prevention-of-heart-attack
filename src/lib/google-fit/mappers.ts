@@ -417,6 +417,7 @@ export async function fetchAndMapSleep(
         
         sleepSources = Array.from(new Set([...sleepSources, ...discovered]));
       }
+      console.log(`[GFit Sleep] Discovered ${sleepSources.length} sleep sources:`, sleepSources);
     } catch (e) {
       console.error("[GFit Sleep] DataSources discovery error:", e);
     }
@@ -523,6 +524,7 @@ export async function fetchAndMapSleep(
     console.error("[GFit Sleep] Segment discovery error:", err);
   }
 
+  console.log(`[GFit Sleep] Total mapped sleep sessions: ${sessions.length}`);
   return sessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
