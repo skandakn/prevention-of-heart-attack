@@ -322,11 +322,6 @@ export function AppHeader() {
           {titles[pathname] || "BeatAhead"}
         </h2>
         <div className="flex items-center gap-2 sm:gap-3">
-          <HeaderProStatusBadge />
-          <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-medium border border-amber-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-            Simulated Data
-          </span>
           <SettingsButton />
 
           <div className="ml-1 pl-2 border-l border-navy-200 flex items-center">

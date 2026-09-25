@@ -3,8 +3,6 @@
 import { useSimulation } from "@/lib/simulation/SimulationContext";
 import { cn, formatDeviation } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DisclaimerBanner } from "@/components/layout/Footer";
-import { SimulatedBadge } from "@/components/layout/Toast";
 import { TrendingDown, TrendingUp, Minus, Cpu, ShieldAlert, CheckCircle2 } from "lucide-react";
 import { CANONICAL_MATRIX_A_FEATURES, MATRIX_A_BOUNDS } from "@/lib/isi/matrix_a";
 
@@ -55,10 +53,8 @@ export default function SignalsPage() {
           <h1 className="text-2xl font-bold text-navy-900">Feature Analysis</h1>
           <p className="text-sm text-navy-500">Extracted physiological features & 26-feature Matrix A schema</p>
         </div>
-        <SimulatedBadge />
       </div>
 
-      <DisclaimerBanner />
 
       {/* Matrix A Model Pipeline Header */}
       <Card className="border-indigo-100 bg-gradient-to-r from-indigo-50/50 via-white to-slate-50">

@@ -7,8 +7,6 @@ import { ISIGauge } from "@/components/isi/ISIGauge";
 import { BaselineCard } from "@/components/isi/BaselineCard";
 import { RiskTrendBanner } from "@/components/isi/RiskTrendBanner";
 import { ContributionBars } from "@/components/isi/ContributionBars";
-import { DisclaimerBanner } from "@/components/layout/Footer";
-import { SimulatedBadge } from "@/components/layout/Toast";
 import { useSimulation } from "@/lib/simulation/SimulationContext";
 import { ISI_RANGE_LABELS } from "@/lib/isi/types";
 import Link from "next/link";
@@ -31,8 +29,6 @@ export default function DashboardPage() {
           <p className="text-sm text-navy-500 mt-0.5">Cardiovascular Risk &amp; Health Overview</p>
         </div>
       </div>
-
-      <DisclaimerBanner />
 
       <DashboardStats />
 

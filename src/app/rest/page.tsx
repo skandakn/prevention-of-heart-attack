@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { FitRestProvider } from "@/lib/fit-rest/FitRestContext";
 import { RestProfileForm } from "@/components/fit-rest/RestProfileForm";
@@ -8,8 +8,6 @@ import { WindDownRoutine } from "@/components/fit-rest/WindDownRoutine";
 import { SleepHistory } from "@/components/fit-rest/SleepHistory";
 import { RestAIChat } from "@/components/rest/RestAIChat";
 import { RestReport } from "@/components/rest/RestReport";
-import { DisclaimerBanner } from "@/components/layout/Footer";
-import { SimulatedBadge } from "@/components/layout/Toast";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Moon, FileText } from "lucide-react";
 
@@ -19,24 +17,18 @@ function RestPageInner() {
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-7xl mx-auto">
       {/* ── Page header ───────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <h1 className="text-2xl font-bold text-navy-900">Rest & Sleep</h1>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
-              <Moon className="h-3 w-3" />
-              Wellness Agent
-            </span>
-          </div>
-          <p className="text-sm text-navy-500">
-            Personalized sleep and recovery guidance based on your wellness patterns.
-          </p>
+      <div>
+        <div className="flex flex-wrap items-center gap-2 mb-1">
+          <h1 className="text-2xl font-bold text-navy-900">Rest & Sleep</h1>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
+            <Moon className="h-3 w-3" />
+            Wellness Agent
+          </span>
         </div>
-        <SimulatedBadge className="self-start sm:self-auto shrink-0" />
+        <p className="text-sm text-navy-500">
+          Personalized sleep and recovery guidance based on your wellness patterns.
+        </p>
       </div>
-
-      {/* ── Disclaimer ────────────────────────────────────────────────── */}
-      <DisclaimerBanner />
 
       {/* ── Tabs ──────────────────────────────────────────────────────── */}
       <Tabs defaultValue="overview">

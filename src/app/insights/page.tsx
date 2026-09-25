@@ -3,8 +3,6 @@
 import { ContributionBars } from "@/components/isi/ContributionBars";
 import { ISIGauge } from "@/components/isi/ISIGauge";
 import { RiskTrendBanner } from "@/components/isi/RiskTrendBanner";
-import { DisclaimerBanner } from "@/components/layout/Footer";
-import { SimulatedBadge } from "@/components/layout/Toast";
 import { ResearchModelSignalCard } from "@/components/ml/ResearchModelSignalCard";
 import { useSimulation } from "@/lib/simulation/SimulationContext";
 import { useSubscription } from "@/lib/subscription/SubscriptionContext";
@@ -53,19 +51,13 @@ export default function InsightsPage() {
 
   const content = (
     <div className="p-4 lg:p-8 space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-navy-900">AI Insights</h1>
-          <p className="text-sm text-navy-500">Explainable multi-source physiological analysis & research model signal</p>
-        </div>
-        <SimulatedBadge />
+      <div>
+        <h1 className="text-2xl font-bold text-navy-900">AI Insights</h1>
+        <p className="text-sm text-navy-500">Explainable multi-source physiological analysis & research model signal</p>
       </div>
-
-      <DisclaimerBanner />
 
       {/* Phase 7 Staging ML Integration: Research Model Signal */}
       <ResearchModelSignalCard />
-
       <RiskTrendBanner />
 
       <div className="grid lg:grid-cols-3 gap-6">

@@ -20,7 +20,6 @@ import {
   UserCheck,
   Stethoscope,
   Sparkles,
-  PhoneForwarded,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -28,7 +27,6 @@ import { filterAcousticEcho } from '@/core/utils/echo-filter';
 import { extractCardiacFindings } from '@/core/extraction/deterministic-extractor';
 
 export default function HelplinePage() {
-  const [activeTab, setActiveTab] = useState<'voice' | 'phone'>('voice');
   const [isConnected, setIsConnected] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -40,12 +38,6 @@ export default function HelplinePage() {
   >([]);
   const [extractedData, setExtractedData] = useState<Record<string, any>>({});
   const [inputMessage, setInputMessage] = useState('');
-
-  // Exotel Phone Call state
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [phoneCallStatus, setPhoneCallStatus] = useState<string | null>(null);
-  const [phoneCallId, setPhoneCallId] = useState<string | null>(null);
-  const [isDialing, setIsDialing] = useState(false);
 
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
@@ -390,36 +382,6 @@ export default function HelplinePage() {
     }
   };
 
-  // Exotel Outbound Phone Call trigger
-  const handleDialExotel = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phoneNumber.trim()) return;
-
-    setIsDialing(true);
-    setPhoneCallStatus('Initiating call via Exotel PSTN gateway...');
-
-    try {
-      const res = await fetch('/api/exotel/call', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: phoneNumber.trim() }),
-      });
-
-      const data = await res.json();
-      setIsDialing(false);
-
-      if (data.success) {
-        setPhoneCallId(data.callId);
-        setPhoneCallStatus(`Call successfully queued! Exotel Call SID: ${data.callId}. Your phone should ring shortly.`);
-      } else {
-        setPhoneCallStatus(`Error: ${data.error || 'Failed to initiate phone call'}`);
-      }
-    } catch (err: any) {
-      setIsDialing(false);
-      setPhoneCallStatus(`Connection error: ${err.message}`);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8">
       {/* Header */}
@@ -439,7 +401,7 @@ export default function HelplinePage() {
                 </span>
               </div>
               <p className="text-xs md:text-sm text-slate-400">
-                Low-Latency Voice Triage • Exotel Telephony • Groq Whisper • Gemini LLM • ElevenLabs TTS
+                Low-Latency Real-Time Voice Triage • Groq Whisper STT • Gemini LLM • ElevenLabs Voice Synthesis
               </p>
             </div>
           </div>
@@ -464,33 +426,8 @@ export default function HelplinePage() {
       {/* Main Grid */}
       <div className="mx-auto max-w-6xl grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Cols: Interactive Terminal */}
-        <div className="lg:col-span-2 flex flex-col rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-md overflow-hidden shadow-xl">
-          {/* Mode Switcher Tabs */}
-          <div className="flex border-b border-slate-800 bg-slate-950/50 p-2 gap-2">
-            <button
-              onClick={() => setActiveTab('voice')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all ${
-                activeTab === 'voice'
-                  ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-              }`}
-            >
-              <Mic className="h-4 w-4" /> Live Browser Voice Triage
-            </button>
-            <button
-              onClick={() => setActiveTab('phone')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all ${
-                activeTab === 'phone'
-                  ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-              }`}
-            >
-              <PhoneCall className="h-4 w-4" /> Real Phone Call (Exotel Gateway)
-            </button>
-          </div>
-
-          {activeTab === 'voice' ? (
-            <div className="flex flex-col h-[520px]">
+        <div className="lg:col-span-2 flex flex-col rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-md overflow-hidden shadow-xl h-[560px]">
+          {/* Call Controls Bar */}
               {/* Call Controls Bar */}
               <div className="flex items-center justify-between border-b border-slate-800/80 bg-slate-900/90 px-5 py-3">
                 <div className="flex items-center gap-3">
@@ -626,57 +563,6 @@ export default function HelplinePage() {
                 </button>
               </form>
             </div>
-          ) : (
-            /* Exotel Phone Call Tab */
-            <div className="p-8 flex flex-col justify-center min-h-[520px]">
-              <div className="max-w-md mx-auto w-full">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-600/10 border border-red-500/20 text-red-500 mb-4">
-                  <PhoneForwarded className="h-7 w-7" />
-                </div>
-                <h3 className="text-lg font-bold text-white">Dial Direct Phone Helpline via Exotel</h3>
-                <p className="mt-1 text-xs text-slate-400 leading-relaxed mb-6">
-                  Initiate a real cellular/telephone call to any mobile number. BeatAhead will connect via the Exotel telephony network and start an interactive voice consultation.
-                </p>
-
-                <form onSubmit={handleDialExotel} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                      Destination Phone Number (E.164 with Country Code)
-                    </label>
-                    <input
-                      type="tel"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      placeholder="+919876543210"
-                      className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                    />
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Format example: <code>+919876543210</code> (India) or <code>+14155552671</code> (US)
-                    </p>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isDialing || !phoneNumber.trim()}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-red-600 hover:bg-red-500 py-3 px-4 text-xs font-bold text-white shadow-lg shadow-red-600/30 disabled:opacity-50 transition-all"
-                  >
-                    <PhoneCall className="h-4 w-4" />
-                    {isDialing ? 'Initiating Exotel Dispatch...' : 'Dial Phone Call via Exotel'}
-                  </button>
-                </form>
-
-                {phoneCallStatus && (
-                  <div className="mt-6 rounded-xl border border-slate-800 bg-slate-950 p-4 text-xs leading-relaxed text-slate-300">
-                    <p className="font-semibold text-white mb-1 flex items-center gap-1.5">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Telephony Status:
-                    </p>
-                    <p>{phoneCallStatus}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Right Col: Extracted Findings & Protocols */}
         <div className="space-y-6">

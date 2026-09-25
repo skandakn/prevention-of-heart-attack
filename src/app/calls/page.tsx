@@ -165,14 +165,12 @@ export default function CallsPage() {
         </div>
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 shadow-md">
-          <p className="text-xs font-semibold uppercase text-slate-400">Telephony Channel</p>
+          <p className="text-xs font-semibold uppercase text-slate-400">Voice Triage Channel</p>
           <p className="mt-1 text-2xl font-black text-slate-200">
-            {stats?.modeDistribution?.phone || 0}{' '}
-            <span className="text-xs font-normal text-slate-400">Phone</span> /{' '}
-            {stats?.modeDistribution?.browser || calls.length}{' '}
-            <span className="text-xs font-normal text-slate-400">Browser</span>
+            {stats?.totalCalls || calls.length}{' '}
+            <span className="text-xs font-normal text-slate-400">Consultations</span>
           </p>
-          <p className="text-[11px] text-slate-500 mt-0.5">Exotel PSTN Gateway</p>
+          <p className="text-[11px] text-slate-500 mt-0.5">Real-time AI Voice Engine</p>
         </div>
       </div>
 

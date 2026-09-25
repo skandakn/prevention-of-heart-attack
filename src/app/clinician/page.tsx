@@ -6,8 +6,7 @@ import { useSubscription } from "@/lib/subscription/SubscriptionContext";
 import { Paywall } from "@/components/ui/Paywall";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DisclaimerBanner } from "@/components/layout/Footer";
-import { SimulatedBadge } from "@/components/layout/Toast";
+
 import { cn, getTrendLabel } from "@/lib/utils";
 import { ISIGauge } from "@/components/isi/ISIGauge";
 import { ContributionBars } from "@/components/isi/ContributionBars";
@@ -59,15 +58,10 @@ export default function ClinicianPage() {
           <h1 className="text-2xl font-bold text-navy-900">Clinician Dashboard</h1>
           <p className="text-sm text-navy-500">Clinical decision support prototype</p>
         </div>
-        <div className="flex items-center gap-3">
-          <SimulatedBadge />
-          <Button onClick={exportReport} variant="outline" size="sm" className="gap-2">
-            <Download className="w-4 h-4" /> Export Report
-          </Button>
-        </div>
+        <Button onClick={exportReport} variant="outline" size="sm" className="gap-2">
+          <Download className="w-4 h-4" /> Export Report
+        </Button>
       </div>
-
-      <DisclaimerBanner />
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800">
         <div>
