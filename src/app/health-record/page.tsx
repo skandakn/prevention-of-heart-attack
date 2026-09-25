@@ -312,12 +312,33 @@ function HealthRecordPageContent() {
   const [animating, setAnimating] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
 
-  // Load existing record
+  // ── localStorage key for this user ──────────────────────────────────────────
+  const lsKey = `beatahead-patient-record-${effectiveUserId}`;
+
+  // Load existing record — try localStorage first, then API as fallback
   useEffect(() => {
     if (!isLoaded) return;
     let active = true;
     setIsLoading(true);
     setError(null);
+
+    // 1. Try localStorage (instant, works on Vercel)
+    try {
+      const stored = localStorage.getItem(lsKey);
+      if (stored) {
+        const parsed = JSON.parse(stored) as PatientRecord;
+        if (active) {
+          setRecord(parsed);
+          setLists(toTextLists(parsed));
+          setIsLoading(false);
+          return;
+        }
+      }
+    } catch {
+      // ignore parse errors — fall through to API
+    }
+
+    // 2. Fallback: API (returns empty record on Vercel, useful for first load)
     fetch(`/api/patient-record?userId=${encodeURIComponent(effectiveUserId)}`)
       .then(async (res) => {
         const payload = await res.json();
@@ -332,7 +353,7 @@ function HealthRecordPageContent() {
       .catch((e) => active && setError(e instanceof Error ? e.message : "Unable to load."))
       .finally(() => active && setIsLoading(false));
     return () => { active = false; };
-  }, [effectiveUserId, isLoaded]);
+  }, [effectiveUserId, isLoaded, lsKey]);
 
   const updatedLabel = useMemo(() => {
     if (!record.updatedAt) return "Not yet saved";
@@ -406,6 +427,14 @@ function HealthRecordPageContent() {
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || "Unable to save.");
       const saved = payload.record as PatientRecord;
+
+      // Persist to localStorage — this is the authoritative store on Vercel
+      try {
+        localStorage.setItem(lsKey, JSON.stringify(saved));
+      } catch {
+        // Silently ignore storage quota errors
+      }
+
       setRecord(saved);
       setLists(toTextLists(saved));
       if (isOnboarding) {
