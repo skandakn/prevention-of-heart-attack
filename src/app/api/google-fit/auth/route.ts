@@ -16,10 +16,11 @@ export async function GET() {
     );
   }
 
-  // Scopes: read fitness activity sessions + activity segments (no write access)
+  // Scopes: read fitness activity sessions + activity segments + sleep (no write access)
   const scopes = [
     "https://www.googleapis.com/auth/fitness.activity.read",
     "https://www.googleapis.com/auth/fitness.body.read",
+    "https://www.googleapis.com/auth/fitness.sleep.read",
   ].join(" ");
 
   const params = new URLSearchParams({

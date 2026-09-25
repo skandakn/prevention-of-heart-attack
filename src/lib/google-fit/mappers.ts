@@ -7,7 +7,7 @@
  * Reference: https://developers.google.com/fit/rest/v1/reference/users/sessions
  */
 
-import type { WorkoutSession, ExerciseType, WorkoutIntensity } from "@/lib/fit-rest/types";
+import type { WorkoutSession, ExerciseType, WorkoutIntensity, SleepSession, SleepQuality } from "@/lib/fit-rest/types";
 
 // ─── Google Fit activity-type IDs → BeatAhead ExerciseType ───────────────────
 // Full list: https://developers.google.com/fit/rest/v1/reference/activity-types
@@ -313,4 +313,84 @@ export async function fetchAndMapSteps(
   }
 
   return sessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+// ─── Sleep session fetching & mapping ────────────────────────────────────────
+
+/**
+ * Google Fit activity type 72 = "Sleep".
+ * The sessions API returns sleep sessions with startTimeMillis / endTimeMillis.
+ * We compute duration, derive a quality score from duration, and map to SleepSession.
+ *
+ * Reference:
+ *   https://developers.google.com/fit/rest/v1/reference/activity-types (type 72)
+ */
+
+function durationToSleepQuality(durationHours: number): SleepQuality {
+  if (durationHours >= 7.5) return "excellent";
+  if (durationHours >= 6.5) return "good";
+  if (durationHours >= 5)   return "fair";
+  return "poor";
+}
+
+export async function fetchAndMapSleep(
+  accessToken: string,
+  startMs: number,
+  endMs: number
+): Promise<SleepSession[]> {
+  const SLEEP_ACTIVITY_TYPE = 72;
+
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/fitness/v1/users/me/sessions?startTime=${new Date(startMs).toISOString()}&endTime=${new Date(endMs).toISOString()}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    if (!res.ok) {
+      console.error(`[GFit Sleep] Sessions fetch failed: ${res.status}`);
+      return [];
+    }
+
+    const data = await res.json() as { session?: GoogleFitSession[] };
+    const raw = (data.session ?? []).filter(
+      (s) => s.activityType === SLEEP_ACTIVITY_TYPE
+    );
+
+    return raw
+      .filter((s) => {
+        const start = Number(s.startTimeMillis);
+        const end = Number(s.endTimeMillis);
+        // At least 30 minutes
+        return !isNaN(start) && !isNaN(end) && end - start >= 30 * 60 * 1000;
+      })
+      .map((s) => {
+        const startTimeMs = Number(s.startTimeMillis);
+        const endTimeMs = Number(s.endTimeMillis);
+        const durationMs = endTimeMs - startTimeMs;
+        const hoursSlept = Math.round((durationMs / 1000 / 3600) * 10) / 10;
+        // Use sleep start date (local date of bedtime)
+        const dateStr = new Date(startTimeMs).toISOString().split("T")[0];
+        // Bedtime: HH:MM
+        const startDate = new Date(startTimeMs);
+        const bedtime = `${String(startDate.getHours()).padStart(2, "0")}:${String(startDate.getMinutes()).padStart(2, "0")}`;
+        // Wake time: HH:MM
+        const endDate = new Date(endTimeMs);
+        const wakeTime = `${String(endDate.getHours()).padStart(2, "0")}:${String(endDate.getMinutes()).padStart(2, "0")}`;
+
+        return {
+          id: `gfit_sleep_${s.id}`,
+          date: dateStr,
+          bedtime,
+          wakeTime,
+          hoursSlept,
+          quality: durationToSleepQuality(hoursSlept),
+          notes: `Imported from Google Fit${s.name ? `: ${s.name}` : ""}`,
+          isDemoData: false,
+        } satisfies SleepSession;
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  } catch (err) {
+    console.error("[GFit Sleep] Fetch error:", err);
+    return [];
+  }
 }

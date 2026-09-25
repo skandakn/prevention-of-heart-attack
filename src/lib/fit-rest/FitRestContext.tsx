@@ -349,6 +349,7 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
       const data = await res.json() as {
         success?: boolean;
         workouts?: WorkoutSession[];
+        sleepSessions?: SleepSession[];
         token?: GoogleFitToken;
         error?: string;
       };
@@ -370,6 +371,21 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
         } catch {/* ignore */}
         return merged;
       });
+
+      // Merge sleep sessions: keep non-gfit sleep entries, replace gfit_ ones
+      const freshSleep: SleepSession[] = data.sleepSessions ?? [];
+      if (freshSleep.length > 0) {
+        setSleepHistory((prev) => {
+          const nonGfit = prev.filter((s) => !s.id.startsWith("gfit_sleep_"));
+          const merged = [...freshSleep, ...nonGfit].sort(
+            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+          );
+          try {
+            localStorage.setItem(STORAGE_KEYS.SLEEP_HISTORY, JSON.stringify(merged));
+          } catch {/* ignore */}
+          return merged;
+        });
+      }
 
       // Persist refreshed token if it changed
       if (data.token) {

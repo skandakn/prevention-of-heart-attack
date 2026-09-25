@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { mapGoogleFitSessions, fetchAndMapSteps } from "@/lib/google-fit/mappers";
+import { mapGoogleFitSessions, fetchAndMapSteps, fetchAndMapSleep } from "@/lib/google-fit/mappers";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SESSIONS_URL = "https://www.googleapis.com/fitness/v1/users/me/sessions";
@@ -122,10 +122,15 @@ export async function POST(request: Request) {
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     );
 
+    // 4. Fetch sleep sessions (activityType 72) — requires fitness.sleep.read scope
+    const sleepSessions = await fetchAndMapSleep(access_token, allTimeStart, now);
+
     return NextResponse.json({
       success: true,
       workouts,
       workoutCount: workouts.length,
+      sleepSessions,
+      sleepCount: sleepSessions.length,
       // Return possibly-refreshed token so the client can update localStorage
       token: {
         access_token,
