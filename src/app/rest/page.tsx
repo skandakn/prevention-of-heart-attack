@@ -37,7 +37,7 @@ function RestPageInner() {
           <Activity className="h-5 w-5 text-navy-600" />
           <h2 className="text-lg font-semibold text-navy-900">Connect Google Fit</h2>
         </div>
-        <GoogleFitSync />
+        <GoogleFitSync variant="rest" />
       </div>
 
       {/* ── Tabs ──────────────────────────────────────────────────────── */}

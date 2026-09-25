@@ -61,9 +61,70 @@ function connectGoogleFit() {
   window.location.href = "/api/google-fit/auth";
 }
 
+// ─── Variant copy map ────────────────────────────────────────────────────────
+
+type GoogleFitVariant = "fitness" | "nutri" | "rest";
+
+const VARIANT_COPY: Record<
+  GoogleFitVariant,
+  {
+    connectedDescription: string;
+    disconnectedDescription: string;
+    statLabel: string;
+    features: string[];
+    successNote: string;
+  }
+> = {
+  fitness: {
+    connectedDescription:
+      "Your Google Fit workouts are synced into the fitness agent automatically.",
+    disconnectedDescription:
+      "Connect Google Fit to import your real workout sessions and give the AI coach accurate activity data.",
+    statLabel: "Workouts Imported",
+    features: [
+      "Auto-imports runs, cycling, strength & more",
+      "Replaces demo data with your real workouts",
+      "AI coach adapts plans to your actual activity",
+      "Read-only access — we never write to Google Fit",
+    ],
+    successNote:
+      "Workout data is live — the AI coach is using your real Google Fit activity.",
+  },
+  nutri: {
+    connectedDescription:
+      "Your Google Fit activity is synced into the nutrition agent to personalise your calorie and macro targets.",
+    disconnectedDescription:
+      "Connect Google Fit to let the nutrition agent factor in your real activity levels when calculating calorie needs.",
+    statLabel: "Activities Synced",
+    features: [
+      "Activity data used to calculate your calorie budget",
+      "Replaces estimated values with your real energy expenditure",
+      "AI nutrition plan adapts to your actual movement",
+      "Read-only access — we never write to Google Fit",
+    ],
+    successNote:
+      "Activity data is live — the nutrition agent is using your real Google Fit data.",
+  },
+  rest: {
+    connectedDescription:
+      "Your Google Fit activity is synced into the sleep agent to personalise your recovery recommendations.",
+    disconnectedDescription:
+      "Connect Google Fit to let the sleep agent use your real activity levels when tailoring wind-down and recovery plans.",
+    statLabel: "Activities Synced",
+    features: [
+      "Activity data improves sleep quality recommendations",
+      "Replaces estimated values with your real movement patterns",
+      "AI sleep coach adapts recovery plans to your actual activity",
+      "Read-only access — we never write to Google Fit",
+    ],
+    successNote:
+      "Activity data is live — the sleep agent is using your real Google Fit data.",
+  },
+};
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function GoogleFitSync() {
+export function GoogleFitSync({ variant = "fitness" }: { variant?: GoogleFitVariant }) {
   const {
     googleFitConnected,
     googleFitLastSynced,
@@ -74,6 +135,7 @@ export function GoogleFitSync() {
     workoutHistory,
   } = useFitRest();
 
+  const copy = VARIANT_COPY[variant];
   const gfitWorkoutCount = workoutHistory.filter((w) => w.id.startsWith("gfit_")).length;
 
   return (
@@ -95,9 +157,7 @@ export function GoogleFitSync() {
           )}
         </div>
         <CardDescription>
-          {googleFitConnected
-            ? "Your Google Fit workouts are synced into the fitness agent automatically."
-            : "Connect Google Fit to import your real workout sessions and give the AI coach accurate activity data."}
+          {googleFitConnected ? copy.connectedDescription : copy.disconnectedDescription}
         </CardDescription>
       </CardHeader>
 
@@ -110,7 +170,7 @@ export function GoogleFitSync() {
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2.5">
                 <p className="text-[11px] font-medium text-navy-500 uppercase tracking-wide mb-1">
-                  Workouts Imported
+                  {copy.statLabel}
                 </p>
                 <p className="text-xl font-bold text-navy-900">{gfitWorkoutCount}</p>
                 <p className="text-[11px] text-navy-500 mt-0.5">all time</p>
@@ -161,7 +221,7 @@ export function GoogleFitSync() {
             {!googleFitError && googleFitLastSynced && (
               <div className="flex items-center gap-1.5 text-[11px] text-emerald-700">
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                Workout data is live — the AI coach is using your real Google Fit activity.
+                {copy.successNote}
               </div>
             )}
           </>
@@ -171,12 +231,7 @@ export function GoogleFitSync() {
 
             {/* Feature list */}
             <ul className="space-y-1.5">
-              {[
-                "Auto-imports runs, cycling, strength & more",
-                "Replaces demo data with your real workouts",
-                "AI coach adapts plans to your actual activity",
-                "Read-only access — we never write to Google Fit",
-              ].map((item) => (
+              {copy.features.map((item) => (
                 <li key={item} className="flex items-start gap-2 text-xs text-navy-600">
                   <Zap className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
                   {item}
