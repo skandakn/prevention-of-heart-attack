@@ -9,7 +9,7 @@ import { FitnessReport } from "@/components/fitness/FitnessReport";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SimulatedBadge } from "@/components/layout/Toast";
-import { Dumbbell, CheckCircle2, Calendar, TrendingUp, Clock, Target, Activity, History, Award } from "lucide-react";
+import { Dumbbell, CheckCircle2, Calendar, TrendingUp, Clock, Target, Activity, History, Award, Footprints } from "lucide-react";
 import { EXERCISE_TYPE_LABELS } from "@/lib/fit-rest/types";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,25 @@ import { cn } from "@/lib/utils";
 
 function FitnessPageInner() {
   const { workoutHistory, fitnessProfile, recoveryState } = useFitRest();
+
+  const todayISO = new Date().toISOString().split("T")[0];
+
+  // Extract step data from gfit_steps_ entries
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+  function parseStepsFromNotes(notes: string | undefined): number {
+    if (!notes) return 0;
+    const match = notes.match(/^([\d,]+)\s+steps/);
+    return match ? parseInt(match[1].replace(/,/g, ""), 10) : 0;
+  }
+
+  const todaySteps = workoutHistory
+    .filter((w) => w.id.startsWith("gfit_steps_") && w.date === todayISO)
+    .reduce((sum, w) => sum + parseStepsFromNotes(w.notes), 0);
+
+  const weeklySteps = workoutHistory
+    .filter((w) => w.id.startsWith("gfit_steps_") && w.date >= sevenDaysAgo)
+    .reduce((sum, w) => sum + parseStepsFromNotes(w.notes), 0);
 
   // Get today's or most recent workout
   const todaysWorkout = workoutHistory.length > 0 ? workoutHistory[0] : null;
@@ -155,6 +174,68 @@ function FitnessPageInner() {
             </CardContent>
           </Card>
         </div>
+
+        {/* ── Steps Counter card (Google Fit) ──────────────────────────── */}
+        {(todaySteps > 0 || weeklySteps > 0) && (
+          <Card className="border-violet-200 bg-gradient-to-r from-violet-50/60 to-blue-50/40">
+            <CardContent className="pt-5 pb-5">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-full bg-violet-100 p-3">
+                    <Footprints className="h-5 w-5 text-violet-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-violet-700 uppercase tracking-wide mb-0.5">
+                      Footsteps
+                    </p>
+                    <div className="flex items-baseline gap-1.5">
+                      <p className="text-3xl font-bold text-navy-900">
+                        {todaySteps > 0 ? todaySteps.toLocaleString() : weeklySteps.toLocaleString()}
+                      </p>
+                      <p className="text-sm text-navy-500 font-medium">
+                        {todaySteps > 0 ? "steps today" : "steps this week"}
+                      </p>
+                    </div>
+                    {todaySteps > 0 && weeklySteps > 0 && (
+                      <p className="text-xs text-navy-500 mt-0.5">
+                        {weeklySteps.toLocaleString()} steps this week
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <div className={cn(
+                        "h-2 w-2 rounded-full",
+                        todaySteps >= 10000 ? "bg-emerald-500" : todaySteps >= 5000 ? "bg-amber-500" : "bg-red-400"
+                      )} />
+                      <p className="text-[11px] font-semibold text-navy-600">
+                        {todaySteps >= 10000 ? "Goal reached!" : todaySteps >= 5000 ? "Halfway there" : todaySteps > 0 ? "Keep going" : "—"}
+                      </p>
+                    </div>
+                    {todaySteps > 0 && (
+                      <div className="w-28 h-1.5 rounded-full bg-navy-200 overflow-hidden">
+                        <div
+                          className={cn(
+                            "h-full rounded-full transition-all",
+                            todaySteps >= 10000 ? "bg-emerald-500" : "bg-violet-500"
+                          )}
+                          style={{ width: `${Math.min(100, (todaySteps / 10000) * 100)}%` }}
+                        />
+                      </div>
+                    )}
+                    {todaySteps > 0 && (
+                      <p className="text-[10px] text-navy-400">
+                        Goal: 10,000 steps
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Recovery summary */}
         {recoveryState.recentWorkoutSummary && (
