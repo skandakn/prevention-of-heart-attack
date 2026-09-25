@@ -399,6 +399,25 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
       try {
         localStorage.setItem(GFIT_SYNCED_KEY, String(now));
       } catch {/* ignore */}
+
+      // Link Google Fit activity directly to Patient Record vitals & ISI baseline
+      if (typeof window !== "undefined" && freshWorkouts.length > 0) {
+        const derivedExercise = freshWorkouts.length >= 8 ? "active" : freshWorkouts.length >= 3 ? "moderate" : "light";
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith("beatahead-patient-record")) {
+            try {
+              const currentRec = JSON.parse(localStorage.getItem(key) || "{}");
+              if (currentRec.exerciseFrequency !== derivedExercise) {
+                currentRec.exerciseFrequency = derivedExercise;
+                currentRec.updatedAt = new Date().toISOString();
+                localStorage.setItem(key, JSON.stringify(currentRec));
+                window.dispatchEvent(new Event("beatahead-patient-record-updated"));
+              }
+            } catch {}
+          }
+        }
+      }
     } catch (err) {
       setGoogleFitError(
         err instanceof Error ? err.message : "Google Fit sync failed. Please try again."

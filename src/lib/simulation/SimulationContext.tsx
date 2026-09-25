@@ -45,7 +45,11 @@ interface SimulationData {
   timeline: TimelineEvent[];
 }
 
-function buildSimulationData(newScenario: DemoScenario, initialModelProb?: number | null): SimulationData {
+function buildSimulationData(
+  newScenario: DemoScenario,
+  initialModelProb?: number | null,
+  activeBaseline: PersonalBaseline = DEFAULT_BASELINE
+): SimulationData {
   resetSimulation();
   const { samples: historicalSamples } = generateHistoricalData(newScenario, 60);
   const historicalScores: ISIScore[] = [];
@@ -55,11 +59,19 @@ function buildSimulationData(newScenario: DemoScenario, initialModelProb?: numbe
     const feat = extractFeatures(sample, prev, newScenario);
     const score = calculateISI({
       features: feat,
-      baseline: DEFAULT_BASELINE,
+      baseline: activeBaseline,
       historicalScores: historicalScores.map((s) => s.score),
       scenario: newScenario,
       signalQuality: sample.signalQuality.overall,
       timestamp: sample.timestamp,
+      rawSample: {
+        heartRate: sample.heartRate,
+        hrv: sample.hrv,
+        spo2: sample.spo2,
+        ppg: sample.ppg,
+        ecg: sample.ecg,
+        imu: sample.imu,
+      },
       modelProbability: (i === historicalSamples.length - 1 && initialModelProb !== undefined && initialModelProb !== null)
         ? initialModelProb
         : undefined,
@@ -148,33 +160,73 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
 
   const refreshBaseline = useCallback(async () => {
     try {
-      const res = await fetch("/api/patient-record");
-      if (!res.ok) return;
-      const record: PatientRecord = await res.json();
-      setHealthRecord(record);
-      // Only apply if the record has meaningful clinical data
-      const hasData =
-        record.restingHeartRate !== null ||
-        record.systolicBP !== null ||
-        record.bloodPressureCategory !== "" ||
-        record.smokingStatus !== "" ||
-        record.diabetesStatus !== "" ||
-        record.cholesterolStatus !== "" ||
-        record.stressLevel !== "" ||
-        record.exerciseFrequency !== "" ||
-        record.priorHeartAttack ||
-        record.familyHeartAttack;
-      if (hasData) {
-        setBaseline(deriveBaselineFromHealthRecord(record));
+      let record: PatientRecord | null = null;
+
+      // 1. Check local storage for authoritative active record (instant on client & Vercel)
+      if (typeof window !== "undefined") {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith("beatahead-patient-record")) {
+            try {
+              const item = localStorage.getItem(key);
+              if (item) {
+                const parsed = JSON.parse(item) as PatientRecord;
+                if (
+                  parsed.restingHeartRate !== null ||
+                  parsed.systolicBP !== null ||
+                  parsed.bloodPressureCategory !== "" ||
+                  parsed.smokingStatus !== "" ||
+                  parsed.diabetesStatus !== "" ||
+                  parsed.cholesterolStatus !== "" ||
+                  parsed.stressLevel !== "" ||
+                  parsed.exerciseFrequency !== ""
+                ) {
+                  record = parsed;
+                  break;
+                }
+              }
+            } catch {}
+          }
+        }
+      }
+
+      // 2. Fallback to API if not in local storage
+      if (!record) {
+        const res = await fetch("/api/patient-record");
+        if (res.ok) {
+          const apiData = await res.json();
+          record = apiData.record || apiData;
+        }
+      }
+
+      if (record) {
+        setHealthRecord(record);
+        const derived = deriveBaselineFromHealthRecord(record);
+        setBaseline(derived);
+        // Directly recalculate the simulation scores with the user's vitals baseline
+        setSimulationData(buildSimulationData(scenario, modelProbabilityRef.current, derived));
       }
     } catch {
       // silently fall back to DEFAULT_BASELINE
     }
-  }, []);
+  }, [scenario]);
 
   // Fetch on mount
   useEffect(() => {
     refreshBaseline();
+  }, [refreshBaseline]);
+
+  // Listen for storage changes and custom events when health record or vitals are updated
+  useEffect(() => {
+    const handleUpdate = () => {
+      refreshBaseline();
+    };
+    window.addEventListener("beatahead-patient-record-updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    return () => {
+      window.removeEventListener("beatahead-patient-record-updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
   }, [refreshBaseline]);
   // ──────────────────────────────────────────────────────────────────────
 
@@ -249,12 +301,12 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const initializeData = useCallback((newScenario: DemoScenario) => {
-    const data = buildSimulationData(newScenario, modelProbabilityRef.current);
+    const data = buildSimulationData(newScenario, modelProbabilityRef.current, baseline);
     setSimulationData(data);
     setMatrixAFeatures(data.matrixAFeatures);
     previousSampleRef.current = data.currentSample;
     evaluateModel(data.matrixAFeatures);
-  }, [evaluateModel]);
+  }, [evaluateModel, baseline]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {

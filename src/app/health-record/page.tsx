@@ -443,6 +443,9 @@ function HealthRecordPageContent() {
       setLists(toTextLists(saved));
       // Update ISI baseline immediately from new health data
       await refreshBaseline();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("beatahead-patient-record-updated"));
+      }
       if (isOnboarding) {
         router.push("/dashboard");
       } else {
