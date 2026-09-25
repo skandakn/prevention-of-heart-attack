@@ -261,6 +261,8 @@ export async function fetchAndMapSteps(
     ? [{ dataTypeName: stepDataType, dataSourceId: stepSourceId }]
     : [{ dataTypeName: "com.google.step_count.delta" }];
 
+  const stepStart = Math.max(startMs, endMs - 60 * 86400000);
+
   let aggRes = await fetch(
     "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate",
     {
@@ -269,9 +271,10 @@ export async function fetchAndMapSteps(
       body: JSON.stringify({
         aggregateBy,
         bucketByTime: { durationMillis: "86400000" },
-        startTimeMillis: String(startMs),
+        startTimeMillis: String(stepStart),
         endTimeMillis: String(endMs),
       }),
+      signal: AbortSignal.timeout(10000),
     }
   );
 
@@ -285,9 +288,10 @@ export async function fetchAndMapSteps(
         body: JSON.stringify({
           aggregateBy: [{ dataTypeName: "com.google.step_count.delta" }],
           bucketByTime: { durationMillis: "86400000" },
-          startTimeMillis: String(startMs),
+          startTimeMillis: String(stepStart),
           endTimeMillis: String(endMs),
         }),
+        signal: AbortSignal.timeout(10000),
       }
     );
   }

@@ -95,65 +95,90 @@ export async function POST(request: Request) {
     }
   }
 
-  // Fetch all activity since Google Fit launched (Jan 1 2015) to capture full history
+  // Fetch recent activity history (up to 365 days for sessions, 60 days for granular steps/sleep/nutrition)
   const now = Date.now();
-  const allTimeStart = new Date("2015-01-01T00:00:00.000Z").getTime();
+  const ONE_YEAR = 365 * 86400000;
+  const sessionsStart = new Date(now - ONE_YEAR).toISOString();
 
+  let sessionWorkouts: ReturnType<typeof mapGoogleFitSessions> = [];
+  let stepWorkouts: ReturnType<typeof mapGoogleFitSessions> = [];
+  let sleepSessions: Awaited<ReturnType<typeof fetchAndMapSleep>> = [];
+  let nutrition: Awaited<ReturnType<typeof fetchAndMapNutrition>> | null = null;
+  const syncErrors: string[] = [];
+
+  // 1. Fetch tracked sessions
   try {
-    // 1. Fetch tracked sessions
     const sessionsRes = await fetch(
-      `${SESSIONS_URL}?startTime=${new Date(allTimeStart).toISOString()}&endTime=${new Date(now).toISOString()}`,
-      { headers: { Authorization: `Bearer ${access_token}` } }
+      `${SESSIONS_URL}?startTime=${sessionsStart}&endTime=${new Date(now).toISOString()}`,
+      {
+        headers: { Authorization: `Bearer ${access_token}` },
+        signal: AbortSignal.timeout(12000),
+      }
     );
 
-    if (!sessionsRes.ok) {
-      const errText = await sessionsRes.text();
+    if (sessionsRes.ok) {
+      const sessionsData = (await sessionsRes.json()) as { session?: unknown[] };
+      const rawSessions = Array.isArray(sessionsData.session) ? sessionsData.session : [];
+      sessionWorkouts = mapGoogleFitSessions(rawSessions as Parameters<typeof mapGoogleFitSessions>[0]);
+    } else if (sessionsRes.status === 401) {
       return NextResponse.json(
-        { error: `Google Fit API error (${sessionsRes.status}): ${errText}` },
-        { status: sessionsRes.status }
+        { error: "Google Fit session expired. Please reconnect your account." },
+        { status: 401 }
       );
+    } else {
+      console.warn(`[GFit Sync] Sessions HTTP ${sessionsRes.status}`);
     }
-
-    const sessionsData = await sessionsRes.json() as { session?: unknown[] };
-    const rawSessions = Array.isArray(sessionsData.session) ? sessionsData.session : [];
-    const sessionWorkouts = mapGoogleFitSessions(rawSessions as Parameters<typeof mapGoogleFitSessions>[0]);
-
-    // 2. Fetch daily step counts (passive tracking)
-    const stepWorkouts = await fetchAndMapSteps(access_token, allTimeStart, now);
-
-    // 3. Merge — sessions take priority over step-derived walking on the same day
-    const sessionDates = new Set(sessionWorkouts.map((w) => w.date));
-    const uniqueStepWorkouts = stepWorkouts.filter((w) => !sessionDates.has(w.date));
-    const workouts = [...sessionWorkouts, ...uniqueStepWorkouts].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-
-    // 4. Fetch sleep sessions (activityType 72) — requires fitness.sleep.read scope
-    const sleepSessions = await fetchAndMapSleep(access_token, allTimeStart, now);
-
-    // 5. Fetch nutrition values (com.google.nutrition) — requires fitness.nutrition.read scope
-    const nutrition = await fetchAndMapNutrition(access_token, allTimeStart, now);
-
-    console.log(`[GFit Sync] Done: ${workouts.length} workouts, ${sleepSessions.length} sleep sessions, ${nutrition?.totalMealsCount ?? 0} meals`);
-
-    return NextResponse.json({
-      success: true,
-      workouts,
-      workoutCount: workouts.length,
-      sleepSessions,
-      sleepCount: sleepSessions.length,
-      nutrition,
-      // Return possibly-refreshed token so the client can update localStorage
-      token: {
-        access_token,
-        refresh_token: refresh_token ?? null,
-        expires_at,
-      },
-    });
   } catch (err) {
-    return NextResponse.json(
-      { error: `Failed to fetch Google Fit sessions: ${err instanceof Error ? err.message : String(err)}` },
-      { status: 500 }
-    );
+    console.warn("[GFit Sync] Sessions fetch error:", err);
+    syncErrors.push("sessions");
   }
+
+  // 2. Fetch daily step counts (passive tracking)
+  try {
+    stepWorkouts = await fetchAndMapSteps(access_token, now - 60 * 86400000, now);
+  } catch (err) {
+    console.warn("[GFit Sync] Steps fetch error:", err);
+    syncErrors.push("steps");
+  }
+
+  // 3. Fetch sleep sessions (activityType 72)
+  try {
+    sleepSessions = await fetchAndMapSleep(access_token, now - 90 * 86400000, now);
+  } catch (err) {
+    console.warn("[GFit Sync] Sleep fetch error:", err);
+    syncErrors.push("sleep");
+  }
+
+  // 4. Fetch nutrition values (com.google.nutrition)
+  try {
+    nutrition = await fetchAndMapNutrition(access_token, now - 30 * 86400000, now);
+  } catch (err) {
+    console.warn("[GFit Sync] Nutrition fetch error:", err);
+    syncErrors.push("nutrition");
+  }
+
+  // Merge workouts: sessions take priority over step-derived walking on the same day
+  const sessionDates = new Set(sessionWorkouts.map((w) => w.date));
+  const uniqueStepWorkouts = stepWorkouts.filter((w) => !sessionDates.has(w.date));
+  const workouts = [...sessionWorkouts, ...uniqueStepWorkouts].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+
+  console.log(
+    `[GFit Sync] Complete: ${workouts.length} workouts, ${sleepSessions.length} sleep sessions, ${nutrition?.totalMealsCount ?? 0} meals (errors: ${syncErrors.join(", ") || "none"})`
+  );
+
+  return NextResponse.json({
+    success: true,
+    workouts,
+    workoutCount: workouts.length,
+    sleepSessions,
+    sleepCount: sleepSessions.length,
+    nutrition,
+    token: {
+      access_token,
+      refresh_token: refresh_token ?? null,
+      expires_at,
+    },
+  });
 }

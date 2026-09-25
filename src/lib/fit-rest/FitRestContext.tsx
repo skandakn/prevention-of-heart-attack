@@ -69,6 +69,7 @@ interface FitRestContextValue {
   disconnectGoogleFit: () => void;
   importPhoneSleepData: () => void;
   importPhoneNutritionData: () => void;
+  clearGoogleFitError: () => void;
 }
 
 const FitRestContext = createContext<FitRestContextValue | null>(null);
@@ -511,6 +512,7 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
 
   // ── Import Phone Sleep Data (9h 24m) ──────────────────────────────────────
   const importPhoneSleepData = useCallback(() => {
+    setGoogleFitError(null);
     const now = new Date();
     // 5 tracked nights matching 9h 24m average (47 hours total / 5 nights = 9.4h)
     const sessions: SleepSession[] = [
@@ -586,6 +588,7 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
 
   // ── Import Phone Nutrition Data (2,150 kcal Heart-Healthy Profile) ────────
   const importPhoneNutritionData = useCallback(() => {
+    setGoogleFitError(null);
     const todayStr = new Date().toISOString().split("T")[0];
     const phoneNutrition: GoogleFitNutritionData = {
       today: {
@@ -674,6 +677,10 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, []);
 
+  const clearGoogleFitError = useCallback(() => {
+    setGoogleFitError(null);
+  }, []);
+
   const value: FitRestContextValue = {
     fitnessProfile,
     updateFitnessProfile,
@@ -701,6 +708,7 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
     disconnectGoogleFit,
     importPhoneSleepData,
     importPhoneNutritionData,
+    clearGoogleFitError,
   };
 
   return (

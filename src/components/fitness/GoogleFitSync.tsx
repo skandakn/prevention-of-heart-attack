@@ -141,6 +141,7 @@ export function GoogleFitSync({ variant = "fitness" }: { variant?: GoogleFitVari
     googleFitNutrition,
     importPhoneSleepData,
     importPhoneNutritionData,
+    clearGoogleFitError,
   } = useFitRest();
 
   const copy = VARIANT_COPY[variant];
@@ -405,11 +406,21 @@ export function GoogleFitSync({ variant = "fitness" }: { variant?: GoogleFitVari
               </div>
             )}
 
-            {/* Error banner */}
+            {/* Error banner with dismiss */}
             {googleFitError && (
-              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
-                <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-                <p className="text-xs text-red-700 leading-relaxed">{googleFitError}</p>
+              <div className="flex items-start justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-red-700 leading-relaxed">{googleFitError}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearGoogleFitError}
+                  className="text-xs text-red-400 hover:text-red-700 font-bold px-1"
+                  title="Dismiss"
+                >
+                  ✕
+                </button>
               </div>
             )}
 
@@ -459,11 +470,21 @@ export function GoogleFitSync({ variant = "fitness" }: { variant?: GoogleFitVari
               ))}
             </ul>
 
-            {/* Error banner */}
+            {/* Error banner with dismiss */}
             {googleFitError && (
-              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
-                <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-                <p className="text-xs text-red-700 leading-relaxed">{googleFitError}</p>
+              <div className="flex items-start justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-red-700 leading-relaxed">{googleFitError}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearGoogleFitError}
+                  className="text-xs text-red-400 hover:text-red-700 font-bold px-1"
+                  title="Dismiss"
+                >
+                  ✕
+                </button>
               </div>
             )}
 
