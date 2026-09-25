@@ -161,9 +161,6 @@ function durationToIntensity(durationMs: number, activityType: number): WorkoutI
   return "light";
 }
 
-// Max plausible session duration — anything over 3 hours is likely a tracker error
-const MAX_SESSION_MINUTES = 180;
-
 // ─── Google Fit session interface (minimal fields we use) ─────────────────────
 
 interface GoogleFitSession {
@@ -188,10 +185,7 @@ export function mapGoogleFitSessions(sessions: GoogleFitSession[]): WorkoutSessi
       const startMs = Number(s.startTimeMillis);
       const endMs = Number(s.endTimeMillis);
       const durationMs = endMs - startMs;
-      const durationMinutes = Math.min(
-        Math.round(durationMs / 1000 / 60),
-        MAX_SESSION_MINUTES
-      );
+      const durationMinutes = Math.max(1, Math.round(durationMs / 1000 / 60));
       const type = resolveExerciseType(s.activityType);
       const intensity = durationToIntensity(durationMs, s.activityType);
       const dateStr = new Date(startMs).toISOString().split("T")[0]; // YYYY-MM-DD
