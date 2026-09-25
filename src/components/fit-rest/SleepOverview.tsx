@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useFitRest } from "@/lib/fit-rest/FitRestContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -8,20 +8,44 @@ import { cn } from "@/lib/utils";
 // ─── Helper Functions ─────────────────────────────────────────────────────────
 
 function formatTime(timeStr: string): string {
-  const [hour, minute] = timeStr.split(':').map(Number);
-  const period = hour >= 12 ? 'PM' : 'AM';
-  const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-  return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
+  if (!timeStr) return "--:--";
+  if (timeStr.includes("T")) {
+    const d = new Date(timeStr);
+    if (!isNaN(d.getTime())) {
+      const h = d.getHours();
+      const m = d.getMinutes();
+      const p = h >= 12 ? 'PM' : 'AM';
+      const dh = h > 12 ? h - 12 : h === 0 ? 12 : h;
+      return `${dh}:${m.toString().padStart(2, '0')} ${p}`;
+    }
+  }
+  if (timeStr.includes(":")) {
+    const [hour, minute] = timeStr.split(':').map(Number);
+    if (!isNaN(hour) && !isNaN(minute)) {
+      const period = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+      return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
+    }
+  }
+  return timeStr;
 }
 
 function getAverageBedtime(sleepHistory: any[], fallback: string): string {
-  if (sleepHistory.length === 0) return fallback;
+  if (!sleepHistory || sleepHistory.length === 0) return fallback;
   
   const recentSessions = sleepHistory.slice(0, 7);
-  const bedtimes = recentSessions.map(s => {
-    const bedtime = new Date(s.bedtime);
-    return bedtime.getHours() + bedtime.getMinutes() / 60;
-  });
+  const bedtimes: number[] = [];
+  for (const s of recentSessions) {
+    if (!s.bedtime) continue;
+    if (typeof s.bedtime === "string" && s.bedtime.includes("T")) {
+      const d = new Date(s.bedtime);
+      if (!isNaN(d.getTime())) bedtimes.push(d.getHours() + d.getMinutes() / 60);
+    } else if (typeof s.bedtime === "string" && s.bedtime.includes(":")) {
+      const [h, m] = s.bedtime.split(":").map(Number);
+      if (!isNaN(h) && !isNaN(m)) bedtimes.push(h + m / 60);
+    }
+  }
+  if (bedtimes.length === 0) return fallback;
   
   const avgHour = bedtimes.reduce((sum, h) => sum + h, 0) / bedtimes.length;
   const hour = Math.floor(avgHour);
@@ -31,13 +55,21 @@ function getAverageBedtime(sleepHistory: any[], fallback: string): string {
 }
 
 function getAverageWakeTime(sleepHistory: any[], fallback: string): string {
-  if (sleepHistory.length === 0) return fallback;
+  if (!sleepHistory || sleepHistory.length === 0) return fallback;
   
   const recentSessions = sleepHistory.slice(0, 7);
-  const wakeTimes = recentSessions.map(s => {
-    const wakeTime = new Date(s.wakeTime);
-    return wakeTime.getHours() + wakeTime.getMinutes() / 60;
-  });
+  const wakeTimes: number[] = [];
+  for (const s of recentSessions) {
+    if (!s.wakeTime) continue;
+    if (typeof s.wakeTime === "string" && s.wakeTime.includes("T")) {
+      const d = new Date(s.wakeTime);
+      if (!isNaN(d.getTime())) wakeTimes.push(d.getHours() + d.getMinutes() / 60);
+    } else if (typeof s.wakeTime === "string" && s.wakeTime.includes(":")) {
+      const [h, m] = s.wakeTime.split(":").map(Number);
+      if (!isNaN(h) && !isNaN(m)) wakeTimes.push(h + m / 60);
+    }
+  }
+  if (wakeTimes.length === 0) return fallback;
   
   const avgHour = wakeTimes.reduce((sum, h) => sum + h, 0) / wakeTimes.length;
   const hour = Math.floor(avgHour);

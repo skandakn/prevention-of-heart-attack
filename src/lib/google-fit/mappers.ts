@@ -351,7 +351,7 @@ export async function fetchAndMapSleep(
   const sessions: SleepSession[] = [];
   const datesWithSleep = new Set<string>();
 
-  // Method 1: Fetch tracked sessions (apps that log Sessions with activityType 72)
+  // 1. Fetch tracked sessions (apps that log Sessions with activityType 72 or name containing sleep/bedtime)
   try {
     const res = await fetch(
       `https://www.googleapis.com/fitness/v1/users/me/sessions?startTime=${new Date(startMs).toISOString()}&endTime=${new Date(endMs).toISOString()}`,
@@ -361,7 +361,7 @@ export async function fetchAndMapSleep(
     if (res.ok) {
       const data = (await res.json()) as { session?: GoogleFitSession[] };
       const raw = (data.session ?? []).filter(
-        (s) => s.activityType === SLEEP_ACTIVITY_TYPE
+        (s) => s.activityType === SLEEP_ACTIVITY_TYPE || s.name?.toLowerCase().includes("sleep") || s.name?.toLowerCase().includes("bedtime")
       );
 
       for (const s of raw) {
@@ -372,17 +372,13 @@ export async function fetchAndMapSleep(
         const durationMs = endTimeMs - startTimeMs;
         const hoursSlept = Math.round((durationMs / 1000 / 3600) * 10) / 10;
         const dateStr = new Date(startTimeMs).toISOString().split("T")[0];
-        const startDate = new Date(startTimeMs);
-        const bedtime = `${String(startDate.getHours()).padStart(2, "0")}:${String(startDate.getMinutes()).padStart(2, "0")}`;
-        const endDate = new Date(endTimeMs);
-        const wakeTime = `${String(endDate.getHours()).padStart(2, "0")}:${String(endDate.getMinutes()).padStart(2, "0")}`;
 
         datesWithSleep.add(dateStr);
         sessions.push({
           id: `gfit_sleep_${s.id}`,
           date: dateStr,
-          bedtime,
-          wakeTime,
+          bedtime: new Date(startTimeMs).toISOString(),
+          wakeTime: new Date(endTimeMs).toISOString(),
           hoursSlept,
           quality: durationToSleepQuality(hoursSlept),
           notes: `Imported from Google Fit${s.name ? `: ${s.name}` : ""}`,
@@ -394,94 +390,116 @@ export async function fetchAndMapSleep(
     console.error("[GFit Sleep] Sessions fetch error:", err);
   }
 
-  // Method 2: Fetch com.google.sleep.segment dataset aggregate (Android Bedtime mode / Health Connect / Wearables)
+  // 2. Discover sleep data sources (com.google.sleep.segment) & read raw datasets
   try {
-    const aggRes = await fetch(
-      "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate",
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          aggregateBy: [{ dataTypeName: "com.google.sleep.segment" }],
-          bucketByTime: { durationMillis: "86400000" },
-          startTimeMillis: String(startMs),
-          endTimeMillis: String(endMs),
-        }),
+    let sleepSources: string[] = ["derived:com.google.sleep.segment:com.google.android.gms:merged"];
+    try {
+      const dsRes = await fetch("https://www.googleapis.com/fitness/v1/users/me/dataSources", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (dsRes.ok) {
+        const dsData = (await dsRes.json()) as {
+          dataSource?: { dataStreamId: string; dataType?: { name: string } }[];
+        };
+        const discovered = (dsData.dataSource ?? [])
+          .filter(
+            (s) =>
+              s.dataType?.name === "com.google.sleep.segment" ||
+              s.dataStreamId.toLowerCase().includes("sleep")
+          )
+          .map((s) => s.dataStreamId);
+        
+        sleepSources = Array.from(new Set([...sleepSources, ...discovered]));
       }
-    );
+    } catch (e) {
+      console.error("[GFit Sleep] DataSources discovery error:", e);
+    }
 
-    if (aggRes.ok) {
-      const aggData = (await aggRes.json()) as {
-        bucket?: {
-          startTimeMillis: string;
-          endTimeMillis: string;
-          dataset?: {
+    const rawPoints: Array<{ startMs: number; endMs: number; stage: number }> = [];
+
+    for (const sourceId of sleepSources) {
+      try {
+        const datasetId = `${startMs}000000-${endMs}000000`;
+        const rawRes = await fetch(
+          `https://www.googleapis.com/fitness/v1/users/me/dataSources/${encodeURIComponent(sourceId)}/datasets/${datasetId}`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+
+        if (rawRes.ok) {
+          const rawData = (await rawRes.json()) as {
             point?: {
-              startTimeNanos: string;
-              endTimeNanos: string;
-              value?: { intVal?: number }[];
+              startTimeNanos?: string;
+              endTimeNanos?: string;
+              value?: Array<{ intVal?: number }>;
             }[];
-          }[];
-        }[];
-      };
+          };
 
-      for (const bucket of aggData.bucket ?? []) {
-        const bucketStartMs = Number(bucket.startTimeMillis);
-        const dateStr = new Date(bucketStartMs).toISOString().split("T")[0];
-
-        // Skip if date already covered by a tracked session
-        if (datesWithSleep.has(dateStr)) continue;
-
-        let totalSleepNanos = 0;
-        let earliestStartNanos = Infinity;
-        let latestEndNanos = 0;
-        let pointCount = 0;
-
-        for (const ds of bucket.dataset ?? []) {
-          for (const point of ds.point ?? []) {
-            const startNanos = Number(point.startTimeNanos);
-            const endNanos = Number(point.endTimeNanos);
-            const sleepType = point.value?.[0]?.intVal ?? 0;
-
-            // 1 = awake, 3 = out of bed. Types 2 (sleep), 4 (light), 5 (deep), 6 (REM) count as sleep.
-            const isSleepSegment = sleepType === 0 || sleepType === 2 || sleepType === 4 || sleepType === 5 || sleepType === 6;
-
-            if (isSleepSegment && endNanos > startNanos) {
-              totalSleepNanos += (endNanos - startNanos);
-              if (startNanos < earliestStartNanos) earliestStartNanos = startNanos;
-              if (endNanos > latestEndNanos) latestEndNanos = endNanos;
-              pointCount++;
+          for (const point of rawData.point ?? []) {
+            if (!point.startTimeNanos || !point.endTimeNanos) continue;
+            const pStart = Number(BigInt(point.startTimeNanos) / BigInt(1_000_000));
+            const pEnd = Number(BigInt(point.endTimeNanos) / BigInt(1_000_000));
+            const stage = point.value?.[0]?.intVal ?? 2;
+            if (pEnd > pStart) {
+              rawPoints.push({ startMs: pStart, endMs: pEnd, stage });
             }
           }
         }
+      } catch (e) {
+        console.error(`[GFit Sleep] Raw dataset fetch error for ${sourceId}:`, e);
+      }
+    }
 
-        if (pointCount > 0 && totalSleepNanos >= 30 * 60 * 1e9) {
-          const totalSleepMs = totalSleepNanos / 1e6;
-          const hoursSlept = Math.round((totalSleepMs / (1000 * 3600)) * 10) / 10;
+    // Sort all raw sleep points chronologically
+    rawPoints.sort((a, b) => a.startMs - b.startMs);
 
-          const startMs = earliestStartNanos / 1e6;
-          const endMs = latestEndNanos / 1e6;
+    // Cluster points into nightly sleep sessions (gap between segments <= 3 hours)
+    interface SleepCluster {
+      startMs: number;
+      endMs: number;
+      sleepDurationMs: number;
+    }
+    const clusters: SleepCluster[] = [];
 
-          const startDate = new Date(startMs);
-          const bedtime = `${String(startDate.getHours()).padStart(2, "0")}:${String(startDate.getMinutes()).padStart(2, "0")}`;
-          const endDate = new Date(endMs);
-          const wakeTime = `${String(endDate.getHours()).padStart(2, "0")}:${String(endDate.getMinutes()).padStart(2, "0")}`;
+    for (const pt of rawPoints) {
+      const isAwake = pt.stage === 1 || pt.stage === 3;
+      const duration = pt.endMs - pt.startMs;
+      const lastCluster = clusters[clusters.length - 1];
 
-          sessions.push({
-            id: `gfit_sleep_segment_${dateStr}`,
-            date: dateStr,
-            bedtime,
-            wakeTime,
-            hoursSlept,
-            quality: durationToSleepQuality(hoursSlept),
-            notes: `Imported from Google Fit (Bedtime / Health Connect)`,
-            isDemoData: false,
-          });
-        }
+      if (lastCluster && pt.startMs - lastCluster.endMs <= 3 * 3600 * 1000) {
+        lastCluster.endMs = Math.max(lastCluster.endMs, pt.endMs);
+        if (!isAwake) lastCluster.sleepDurationMs += duration;
+      } else {
+        clusters.push({
+          startMs: pt.startMs,
+          endMs: pt.endMs,
+          sleepDurationMs: isAwake ? 0 : duration,
+        });
+      }
+    }
+
+    for (const cl of clusters) {
+      const effectiveDuration = cl.sleepDurationMs > 0 ? cl.sleepDurationMs : (cl.endMs - cl.startMs);
+      if (effectiveDuration < 30 * 60 * 1000) continue;
+
+      const hoursSlept = Math.round((effectiveDuration / (1000 * 3600)) * 10) / 10;
+      const dateStr = new Date(cl.startMs).toISOString().split("T")[0];
+
+      if (!datesWithSleep.has(dateStr)) {
+        datesWithSleep.add(dateStr);
+        sessions.push({
+          id: `gfit_sleep_${cl.startMs}`,
+          date: dateStr,
+          bedtime: new Date(cl.startMs).toISOString(),
+          wakeTime: new Date(cl.endMs).toISOString(),
+          hoursSlept,
+          quality: durationToSleepQuality(hoursSlept),
+          notes: "Imported from Google Fit (Android Bedtime tracking)",
+          isDemoData: false,
+        });
       }
     }
   } catch (err) {
-    console.error("[GFit Sleep] Segment aggregate fetch error:", err);
+    console.error("[GFit Sleep] Segment discovery error:", err);
   }
 
   return sessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
