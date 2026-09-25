@@ -565,13 +565,13 @@ function extractNutrientsFromMap(
       nutrients.calories += Math.round(val * 10) / 10;
     } else if (k === "protein") {
       nutrients.protein += Math.round(val * 10) / 10;
-    } else if (k === "carbs.total" || k === "carbs") {
+    } else if (k === "carbs.total" || k === "carbs" || k === "total_carbs" || k === "total_carbohydrate") {
       nutrients.carbs += Math.round(val * 10) / 10;
-    } else if (k === "fat.total" || k === "fat") {
+    } else if (k === "fat.total" || k === "fat" || k === "total_fat") {
       nutrients.fat += Math.round(val * 10) / 10;
     } else if (k === "dietary_fiber" || k === "fiber") {
       nutrients.fiber = Math.round(((nutrients.fiber ?? 0) + val) * 10) / 10;
-    } else if (k === "sugar") {
+    } else if (k === "sugar" || k === "sugars") {
       nutrients.sugar = Math.round(((nutrients.sugar ?? 0) + val) * 10) / 10;
     } else if (k === "sodium") {
       nutrients.sodium = Math.round(((nutrients.sodium ?? 0) + val) * 10) / 10;
@@ -614,7 +614,9 @@ export async function fetchAndMapNutrition(
           .filter(
             (s) =>
               s.dataType?.name === "com.google.nutrition" ||
-              s.dataType?.name === "com.google.nutrition.summary"
+              s.dataType?.name === "com.google.nutrition.summary" ||
+              s.dataType?.name?.toLowerCase().includes("nutrition") ||
+              s.dataStreamId?.toLowerCase().includes("nutrition")
           )
           .map((s) => s.dataStreamId);
       }
@@ -712,7 +714,7 @@ export async function fetchAndMapNutrition(
       }
     }
 
-    // 3. If raw source yielded no meals, run dataset:aggregate
+    // 3. If raw source yielded no meals, run dataset:aggregate (clamped to max 30 days)
     if (mealLogs.length === 0) {
       let aggRes = await fetch("https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate", {
         method: "POST",
@@ -723,7 +725,7 @@ export async function fetchAndMapNutrition(
         body: JSON.stringify({
           aggregateBy: [{ dataTypeName: "com.google.nutrition.summary" }],
           bucketByTime: { durationMillis: "86400000" },
-          startTimeMillis: String(startMs),
+          startTimeMillis: String(nutritionStart),
           endTimeMillis: String(endMs),
         }),
       });
@@ -738,7 +740,7 @@ export async function fetchAndMapNutrition(
           body: JSON.stringify({
             aggregateBy: [{ dataTypeName: "com.google.nutrition" }],
             bucketByTime: { durationMillis: "86400000" },
-            startTimeMillis: String(startMs),
+            startTimeMillis: String(nutritionStart),
             endTimeMillis: String(endMs),
           }),
         });

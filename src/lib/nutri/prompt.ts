@@ -27,7 +27,7 @@ CRITICAL SAFETY RULES — ALWAYS FOLLOW WITHOUT EXCEPTION:
 const INTENT_INSTRUCTIONS: Record<NutriIntent, string> = {
   chat: `Respond to the user's general wellness or nutrition question. Be conversational, supportive, and evidence-informed. Keep responses concise (3–6 sentences). Always ground your answer in the user's stated profile and general nutrition science.`,
 
-  daily_plan: `Generate a practical, balanced daily meal plan for this user. Structure it clearly as:
+  daily_plan: `Generate a practical, balanced daily meal plan for this user. If Google Fit nutrition data is available, reference their tracked intake and macronutrient split (calories, protein, carbs, fat) and calibrate meal portions to complement and balance their daily intake. Structure it clearly as:
   
   Breakfast: [example foods and portions]
   Morning snack: [only if 4+ meals/day]
@@ -37,15 +37,15 @@ const INTENT_INSTRUCTIONS: Record<NutriIntent, string> = {
   
   Base the plan on the user's dietary preference, allergens, activity level, and wellness goals. Include brief hydration guidance at the end. Keep portions practical. Do not make medical claims.`,
 
-  recommendations: `Generate exactly 5 concise, actionable wellness nutrition tips for this user. Format as a numbered list (1. 2. 3. 4. 5.). Each tip must be:
+  recommendations: `Generate exactly 5 concise, actionable wellness nutrition tips for this user. If Google Fit nutrition data is available, ensure at least one tip specifically addresses their tracked calorie, protein, fiber, or sodium balance. Format as a numbered list (1. 2. 3. 4. 5.). Each tip must be:
   - Specific and immediately actionable
-  - Based on the user's profile (dietary preference, activity, goals)
+  - Based on the user's profile (dietary preference, activity, goals, and Google Fit nutrition intake)
   - Grounded in general nutrition science
   - Free of medical claims
   
   End with one sentence of encouragement.`,
 
-  explain: `Explain in 3–4 sentences why the nutrition suggestions provided are appropriate for this user. Reference their profile (dietary preference, activity level, wellness goals) and general wellness principles. Do NOT reference the wellness indicator score as a clinical measurement. Use accessible, non-clinical language.`,
+  explain: `Explain in 3–4 sentences why the nutrition suggestions provided are appropriate for this user. Reference their profile (dietary preference, activity level, wellness goals, and Google Fit nutrition intake if present) and general wellness principles. Do NOT reference the wellness indicator score as a clinical measurement. Use accessible, non-clinical language.`,
 };
 
 // ─── Profile summary builder ──────────────────────────────────────────────────
@@ -79,11 +79,29 @@ function buildGoogleFitNutritionSummary(nutrition?: any): string {
   if (!nutrition || (nutrition.today?.calories === 0 && nutrition.totalMealsCount === 0)) {
     return "";
   }
-  return `Google Fit Live Nutrition Data:
-  - Today's Calorie Intake: ${Math.round(nutrition.today?.calories ?? 0)} kcal
-  - Macronutrients: Protein ${Math.round(nutrition.today?.protein ?? 0)}g, Carbs ${Math.round(nutrition.today?.carbs ?? 0)}g, Fat ${Math.round(nutrition.today?.fat ?? 0)}g
-  - Total Logged Meals: ${nutrition.totalMealsCount ?? 0}
-  Factor in their actual dietary intake when providing guidance or calorie targets.`;
+  const lines = [
+    "Google Fit Live Nutrition Data:",
+    `- Today's Calorie Intake: ${Math.round(nutrition.today?.calories ?? 0)} kcal`,
+    `- Macronutrients: Protein ${Math.round(nutrition.today?.protein ?? 0)}g, Carbs ${Math.round(nutrition.today?.carbs ?? 0)}g, Fat ${Math.round(nutrition.today?.fat ?? 0)}g`,
+  ];
+  if (nutrition.today?.fiber) {
+    lines.push(`- Dietary Fiber: ${Math.round(nutrition.today.fiber)}g`);
+  }
+  if (nutrition.today?.sodium) {
+    lines.push(`- Sodium: ${Math.round(nutrition.today.sodium)}mg`);
+  }
+  if (nutrition.totalMealsCount) {
+    lines.push(`- Total Logged Meals: ${nutrition.totalMealsCount}`);
+  }
+  if (nutrition.meals && Array.isArray(nutrition.meals) && nutrition.meals.length > 0) {
+    const mealSummaries = nutrition.meals
+      .slice(0, 4)
+      .map((m: any) => `${m.name} (${Math.round(m.nutrients?.calories || 0)} kcal, ${Math.round(m.nutrients?.protein || 0)}g P)`)
+      .join("; ");
+    lines.push(`- Recent Tracked Meals: ${mealSummaries}`);
+  }
+  lines.push("Factor in their actual dietary intake when providing guidance, meal recommendations, or calorie targets.");
+  return lines.join("\n  ");
 }
 
 // ─── Exported prompt builder ──────────────────────────────────────────────────

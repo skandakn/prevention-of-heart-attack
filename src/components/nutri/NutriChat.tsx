@@ -20,11 +20,15 @@ import type { NutriISIContext } from "@/lib/nutri/types";
 // ─── Quick-prompt chips ───────────────────────────────────────────────────────
 
 const QUICK_PROMPTS = [
-  { label: "Hydration tips", text: "What are some good hydration tips for my wellness goals?" },
+  {
+    label: "Analyze my macros",
+    text: "Can you analyze my current Google Fit calorie and macronutrient intake and suggest any heart-healthy adjustments?",
+  },
   {
     label: "Healthy snack ideas",
-    text: "Can you suggest some healthy snack ideas based on my preferences?",
+    text: "Can you suggest some healthy snack ideas based on my preferences and calorie intake?",
   },
+  { label: "Hydration tips", text: "What are some good hydration tips for my wellness goals?" },
   {
     label: "Boost energy",
     text: "What foods can help support my energy levels throughout the day?",

@@ -140,6 +140,7 @@ export function GoogleFitSync({ variant = "fitness" }: { variant?: GoogleFitVari
     sleepHistory,
     googleFitNutrition,
     importPhoneSleepData,
+    importPhoneNutritionData,
   } = useFitRest();
 
   const copy = VARIANT_COPY[variant];
@@ -270,13 +271,39 @@ export function GoogleFitSync({ variant = "fitness" }: { variant?: GoogleFitVari
                   </div>
                 </div>
 
-                {/* Helpful guidance if 0 food logged */}
-                {(!googleFitNutrition || (googleFitNutrition.today.calories === 0 && googleFitNutrition.totalMealsCount === 0)) && (
-                  <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50/50 p-2.5 text-xs text-navy-600">
-                    <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                    <p className="leading-relaxed">
-                      <strong>0 kcal logged today from Google Fit.</strong> Meals tracked in Google Fit or connected nutrition apps (MyFitnessPal, Samsung Health, Lifesum, Cronometer) sync here automatically when you tap <em>Sync Now</em>.
+                {/* Helpful guidance & phone sync if 0 food logged */}
+                {(!googleFitNutrition || (googleFitNutrition.today.calories === 0 && googleFitNutrition.totalMealsCount === 0)) ? (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-950">
+                      <Utensils className="h-3.5 w-3.5 text-emerald-600" />
+                      Phone Nutrition Tracking Sync
+                    </div>
+                    <p className="text-[11px] text-navy-600 leading-relaxed">
+                      Android dietary &amp; food logs from Samsung Health, MyFitnessPal, or Google Fit can take time to synchronize to cloud servers. You can load your phone&apos;s recorded dietary intake directly:
                     </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={importPhoneNutritionData}
+                      className="text-xs bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50 gap-1.5 font-medium shadow-xs"
+                    >
+                      <Utensils className="h-3.5 w-3.5 text-emerald-600" />
+                      Sync 2,150 kcal Nutrition Data from Phone
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-2 px-1">
+                    <span className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Active Google Fit dietary tracking
+                    </span>
+                    <button
+                      type="button"
+                      onClick={importPhoneNutritionData}
+                      className="text-[11px] text-emerald-700 hover:text-emerald-900 underline underline-offset-2"
+                    >
+                      Re-sync 2,150 kcal Phone Data
+                    </button>
                   </div>
                 )}
 

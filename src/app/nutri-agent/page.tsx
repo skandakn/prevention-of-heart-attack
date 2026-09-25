@@ -139,16 +139,18 @@ export default function NutriAgentPage() {
       <div className="p-4 lg:p-8 max-w-7xl mx-auto">
         <Paywall featureName="Nutri Agent — AI Wellness Nutrition">
           {/* Blurred preview rendered inside Paywall */}
-          <NutriProvider>
-            <div className="p-4 lg:p-8 space-y-4 max-w-7xl mx-auto pointer-events-none">
-              <div className="h-8 w-48 bg-navy-100 rounded animate-pulse" />
-              <div className="h-4 w-72 bg-navy-50 rounded animate-pulse" />
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="h-64 rounded-xl bg-navy-50 animate-pulse" />
-                <div className="h-64 rounded-xl bg-navy-50 animate-pulse" />
+          <FitRestProvider>
+            <NutriProvider>
+              <div className="p-4 lg:p-8 space-y-4 max-w-7xl mx-auto pointer-events-none">
+                <div className="h-8 w-48 bg-navy-100 rounded animate-pulse" />
+                <div className="h-4 w-72 bg-navy-50 rounded animate-pulse" />
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="h-64 rounded-xl bg-navy-50 animate-pulse" />
+                  <div className="h-64 rounded-xl bg-navy-50 animate-pulse" />
+                </div>
               </div>
-            </div>
-          </NutriProvider>
+            </NutriProvider>
+          </FitRestProvider>
         </Paywall>
       </div>
     );
