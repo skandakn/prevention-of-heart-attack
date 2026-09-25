@@ -6,11 +6,11 @@ import { FitnessAIChat } from "@/components/fitness/FitnessAIChat";
 import { FitnessProfileForm } from "@/components/fitness/FitnessProfileForm";
 import { GoogleFitSync } from "@/components/fitness/GoogleFitSync";
 import { FitnessReport } from "@/components/fitness/FitnessReport";
+import { DailyActivityView } from "@/components/fitness/DailyActivityView";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SimulatedBadge } from "@/components/layout/Toast";
 import { Dumbbell, CheckCircle2, Calendar, TrendingUp, Clock, Target, Activity, History, Award, Footprints } from "lucide-react";
-import { EXERCISE_TYPE_LABELS } from "@/lib/fit-rest/types";
 import { cn } from "@/lib/utils";
 
 // ─── Inner page component (inside FitRestProvider) ────────────────────────────
@@ -39,9 +39,6 @@ function FitnessPageInner() {
 
   // Get today's or most recent workout
   const todaysWorkout = workoutHistory.length > 0 ? workoutHistory[0] : null;
-
-  // Get recent workouts (last 5 for recent activity)
-  const recentWorkouts = workoutHistory.slice(0, 5);
 
   // Calculate weekly progress percentage
   const weeklyProgressPercent = Math.min(
@@ -398,157 +395,8 @@ function FitnessPageInner() {
         )}
       </div>
 
-      {/* ── Workout History Section ────────────────────────────────────── */}
-      {workoutHistory.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <History className="h-5 w-5 text-navy-600" />
-              <h2 className="text-lg font-semibold text-navy-900">Workout History</h2>
-            </div>
-            <p className="text-xs text-navy-500">
-              {workoutHistory.length} {workoutHistory.length === 1 ? "workout" : "workouts"} recorded
-            </p>
-          </div>
-
-          <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-navy-50 border-b border-navy-100">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-navy-700 uppercase tracking-wide">
-                        Date
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-navy-700 uppercase tracking-wide">
-                        Workout Type
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-navy-700 uppercase tracking-wide">
-                        Duration
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-navy-700 uppercase tracking-wide">
-                        Intensity
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-navy-700 uppercase tracking-wide">
-                        Notes
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-navy-100">
-                    {workoutHistory.map((workout, index) => (
-                      <tr key={workout.id} className={cn(
-                        "hover:bg-navy-50/50 transition-colors",
-                        index % 2 === 0 ? "bg-white" : "bg-navy-50/30"
-                      )}>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-navy-900">
-                              {new Date(workout.date).toLocaleDateString("en-US", { 
-                                month: "short", 
-                                day: "numeric"
-                              })}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-sm text-navy-700">
-                            {EXERCISE_TYPE_LABELS[workout.type]}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className="inline-flex items-center gap-1 text-sm font-semibold text-navy-900">
-                            <Clock className="h-3 w-3 text-navy-500" />
-                            {workout.durationMinutes} min
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={cn(
-                            "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold capitalize",
-                            workout.intensity === "light" && "bg-emerald-50 text-emerald-700 border-emerald-200",
-                            workout.intensity === "moderate" && "bg-amber-50 text-amber-700 border-amber-200",
-                            workout.intensity === "intense" && "bg-red-50 text-red-700 border-red-200"
-                          )}>
-                            {workout.intensity}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-navy-600 italic">
-                            {workout.notes || "—"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* ── Recent Activity Section (kept for backward compatibility) ──── */}
-      {recentWorkouts.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-navy-600" />
-              <h2 className="text-lg font-semibold text-navy-900">Recent Activity</h2>
-            </div>
-            <p className="text-xs text-navy-500">
-              Last {recentWorkouts.length} {recentWorkouts.length === 1 ? "workout" : "workouts"}
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            {recentWorkouts.map((workout) => (
-              <Card key={workout.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="py-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="rounded-lg bg-navy-100 p-2 shrink-0">
-                        <Dumbbell className="h-4 w-4 text-navy-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-sm font-semibold text-navy-900 truncate">
-                            {EXERCISE_TYPE_LABELS[workout.type]}
-                          </p>
-                        </div>
-                        <p className="text-xs text-navy-500">
-                          {new Date(workout.date).toLocaleDateString("en-US", { 
-                            month: "short", 
-                            day: "numeric",
-                            year: "numeric"
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 shrink-0">
-                      <div className="text-right">
-                        <p className="text-xs font-medium text-navy-500">Duration</p>
-                        <p className="text-sm font-semibold text-navy-900">
-                          {workout.durationMinutes} min
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs font-medium text-navy-500">Intensity</p>
-                        <p className="text-sm font-semibold text-navy-900 capitalize">
-                          {workout.intensity}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  {workout.notes && (
-                    <p className="text-xs text-navy-600 mt-2 pl-11 italic">
-                      {workout.notes}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* ── Activity History — date-picker daily view ─────────────────── */}
+      <DailyActivityView />
 
       {/* ── My Fitness Profile Section ─────────────────────────────────── */}
       <div className="space-y-4">
