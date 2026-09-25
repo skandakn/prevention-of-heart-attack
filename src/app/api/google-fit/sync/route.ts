@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { mapGoogleFitSessions } from "@/lib/google-fit/mappers";
+import { mapGoogleFitSessions, fetchAndMapSteps } from "@/lib/google-fit/mappers";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SESSIONS_URL = "https://www.googleapis.com/fitness/v1/users/me/sessions";
@@ -94,11 +94,10 @@ export async function POST(request: Request) {
   const allTimeStart = new Date("2015-01-01T00:00:00.000Z").getTime();
 
   try {
+    // 1. Fetch tracked sessions
     const sessionsRes = await fetch(
       `${SESSIONS_URL}?startTime=${new Date(allTimeStart).toISOString()}&endTime=${new Date(now).toISOString()}`,
-      {
-        headers: { Authorization: `Bearer ${access_token}` },
-      }
+      { headers: { Authorization: `Bearer ${access_token}` } }
     );
 
     if (!sessionsRes.ok) {
@@ -111,7 +110,17 @@ export async function POST(request: Request) {
 
     const sessionsData = await sessionsRes.json() as { session?: unknown[] };
     const rawSessions = Array.isArray(sessionsData.session) ? sessionsData.session : [];
-    const workouts = mapGoogleFitSessions(rawSessions as Parameters<typeof mapGoogleFitSessions>[0]);
+    const sessionWorkouts = mapGoogleFitSessions(rawSessions as Parameters<typeof mapGoogleFitSessions>[0]);
+
+    // 2. Fetch daily step counts (passive tracking)
+    const stepWorkouts = await fetchAndMapSteps(access_token, allTimeStart, now);
+
+    // 3. Merge — sessions take priority over step-derived walking on the same day
+    const sessionDates = new Set(sessionWorkouts.map((w) => w.date));
+    const uniqueStepWorkouts = stepWorkouts.filter((w) => !sessionDates.has(w.date));
+    const workouts = [...sessionWorkouts, ...uniqueStepWorkouts].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
 
     return NextResponse.json({
       success: true,

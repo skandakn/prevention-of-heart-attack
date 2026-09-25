@@ -106,3 +106,112 @@ export function mapGoogleFitSessions(sessions: GoogleFitSession[]): WorkoutSessi
     })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
+
+// ─── Step count fetching & mapping ───────────────────────────────────────────
+
+/**
+ * Fetch daily step-count buckets from the Google Fit Fitness API dataset endpoint,
+ * then convert each day that has meaningful steps into a WorkoutSession of type "walking".
+ *
+ * Steps live in a data-source dataset, not in sessions, so they are invisible to
+ * the /sessions endpoint used for tracked workouts.
+ *
+ * Reference:
+ *   https://developers.google.com/fit/rest/v1/reference/users/dataset/aggregate
+ */
+
+interface AggregateBucket {
+  startTimeMillis: string;
+  endTimeMillis: string;
+  dataset?: {
+    dataSourceId: string;
+    point?: {
+      value?: { intVal?: number }[];
+    }[];
+  }[];
+}
+
+interface AggregateResponse {
+  bucket?: AggregateBucket[];
+}
+
+// Minimum steps to count as a meaningful walking session (roughly 10 minutes walking)
+const MIN_STEPS_THRESHOLD = 1000;
+
+// Average walking speed: ~100 steps/minute
+function stepsToDurationMinutes(steps: number): number {
+  return Math.max(5, Math.round(steps / 100));
+}
+
+function stepsToIntensity(steps: number): WorkoutIntensity {
+  if (steps < 3000) return "light";
+  if (steps < 8000) return "moderate";
+  return "intense";
+}
+
+export async function fetchAndMapSteps(
+  accessToken: string,
+  startMs: number,
+  endMs: number
+): Promise<WorkoutSession[]> {
+  const body = {
+    aggregateBy: [
+      {
+        dataTypeName: "com.google.step_count.delta",
+        dataSourceId: "derived:com.google.step_count.delta:com.google.android.gms:estimated_steps",
+      },
+    ],
+    bucketByTime: { durationMillis: "86400000" }, // 1-day buckets
+    startTimeMillis: String(startMs),
+    endTimeMillis: String(endMs),
+  };
+
+  const res = await fetch(
+    "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    }
+  );
+
+  if (!res.ok) {
+    console.error(`[GFit Steps] Aggregate fetch failed: ${res.status}`);
+    return [];
+  }
+
+  const data = (await res.json()) as AggregateResponse;
+  const buckets = data.bucket ?? [];
+  const sessions: WorkoutSession[] = [];
+
+  for (const bucket of buckets) {
+    const startMs = Number(bucket.startTimeMillis);
+    const dateStr = new Date(startMs).toISOString().split("T")[0];
+
+    let totalSteps = 0;
+    for (const ds of bucket.dataset ?? []) {
+      for (const point of ds.point ?? []) {
+        for (const val of point.value ?? []) {
+          totalSteps += val.intVal ?? 0;
+        }
+      }
+    }
+
+    if (totalSteps < MIN_STEPS_THRESHOLD) continue;
+
+    sessions.push({
+      id: `gfit_steps_${dateStr}`,
+      date: dateStr,
+      type: "walking" as ExerciseType,
+      durationMinutes: stepsToDurationMinutes(totalSteps),
+      intensity: stepsToIntensity(totalSteps),
+      notes: `${totalSteps.toLocaleString()} steps · Imported from Google Fit`,
+      isDemoData: false,
+    } satisfies WorkoutSession);
+  }
+
+  return sessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}

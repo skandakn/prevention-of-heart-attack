@@ -1,4 +1,4 @@
-import { mapGoogleFitSessions } from "@/lib/google-fit/mappers";
+import { mapGoogleFitSessions, fetchAndMapSteps } from "@/lib/google-fit/mappers";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SESSIONS_URL = "https://www.googleapis.com/fitness/v1/users/me/sessions";
@@ -77,21 +77,32 @@ export async function GET(request: Request) {
   let workouts: ReturnType<typeof mapGoogleFitSessions> = [];
 
   try {
+    // 1. Fetch tracked sessions (runs, gym, cycling, etc.)
     const sessionsRes = await fetch(
       `${SESSIONS_URL}?startTime=${new Date(allTimeStart).toISOString()}&endTime=${new Date(now).toISOString()}`,
       { headers: { Authorization: `Bearer ${tokens.access_token}` } }
     );
 
+    let sessionWorkouts: ReturnType<typeof mapGoogleFitSessions> = [];
     if (!sessionsRes.ok) {
-      // Non-fatal — redirect with token only, workouts will be empty
       console.error(`[GFit] Sessions fetch failed: ${sessionsRes.status}`);
     } else {
       const sessionsData = await sessionsRes.json() as { session?: unknown[] };
       const rawSessions = Array.isArray(sessionsData.session) ? sessionsData.session : [];
-      workouts = mapGoogleFitSessions(rawSessions as Parameters<typeof mapGoogleFitSessions>[0]);
+      sessionWorkouts = mapGoogleFitSessions(rawSessions as Parameters<typeof mapGoogleFitSessions>[0]);
     }
+
+    // 2. Fetch daily step counts (passive tracking — not in sessions API)
+    const stepWorkouts = await fetchAndMapSteps(tokens.access_token, allTimeStart, now);
+
+    // 3. Merge — prefer tracked sessions over step-derived walking on the same day
+    const sessionDates = new Set(sessionWorkouts.map((w) => w.date));
+    const uniqueStepWorkouts = stepWorkouts.filter((w) => !sessionDates.has(w.date));
+    workouts = [...sessionWorkouts, ...uniqueStepWorkouts].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
   } catch (err) {
-    console.error("[GFit] Sessions fetch error:", err);
+    console.error("[GFit] Data fetch error:", err);
     // Non-fatal — continue with empty workouts
   }
 
