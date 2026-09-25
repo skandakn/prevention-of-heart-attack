@@ -5,8 +5,6 @@ import { SignalPanel } from "@/components/signals/SignalPanel";
 import { ISIGauge } from "@/components/isi/ISIGauge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DisclaimerBanner } from "@/components/layout/Footer";
-import { SimulatedBadge } from "@/components/layout/Toast";
 import { useSimulation } from "@/lib/simulation/SimulationContext";
 import { Play, Pause, RotateCcw, AlertTriangle } from "lucide-react";
 import { ISITrendChart } from "@/components/charts/ISITrendChart";
@@ -37,10 +35,7 @@ export default function MonitorPage() {
           <h1 className="text-2xl font-bold text-navy-900">Live Monitor</h1>
           <p className="text-sm text-navy-500">Real-time simulated physiological signals</p>
         </div>
-        <SimulatedBadge />
       </div>
-
-      <DisclaimerBanner />
 
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-3">

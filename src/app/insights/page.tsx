@@ -3,8 +3,7 @@
 import { ContributionBars } from "@/components/isi/ContributionBars";
 import { ISIGauge } from "@/components/isi/ISIGauge";
 import { RiskTrendBanner } from "@/components/isi/RiskTrendBanner";
-import { DisclaimerBanner } from "@/components/layout/Footer";
-import { SimulatedBadge } from "@/components/layout/Toast";
+
 import { useSimulation } from "@/lib/simulation/SimulationContext";
 import { useSubscription } from "@/lib/subscription/SubscriptionContext";
 import { Paywall } from "@/components/ui/Paywall";
@@ -26,15 +25,10 @@ export default function InsightsPage() {
 
   const content = (
     <div className="p-4 lg:p-8 space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-navy-900">AI Insights</h1>
-          <p className="text-sm text-navy-500">Explainable model contribution analysis</p>
-        </div>
-        <SimulatedBadge />
+      <div>
+        <h1 className="text-2xl font-bold text-navy-900">AI Insights</h1>
+        <p className="text-sm text-navy-500">Explainable model contribution analysis</p>
       </div>
-
-      <DisclaimerBanner />
 
       <RiskTrendBanner />
 

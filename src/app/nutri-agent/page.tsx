@@ -3,8 +3,7 @@
 import { useCallback, useState } from "react";
 import { useSubscription } from "@/lib/subscription/SubscriptionContext";
 import { NutriProvider } from "@/lib/nutri/NutriContext";
-import { DisclaimerBanner } from "@/components/layout/Footer";
-import { SimulatedBadge } from "@/components/layout/Toast";
+
 import { Paywall } from "@/components/ui/Paywall";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { WellnessSnapshot } from "@/components/nutri/WellnessSnapshot";
@@ -30,24 +29,18 @@ function NutriAgentInner() {
     <div className="p-4 lg:p-8 space-y-6 max-w-7xl mx-auto">
 
       {/* ── Page header ───────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <h1 className="text-2xl font-bold text-navy-900">Nutri Agent</h1>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-              <Sparkles className="h-3 w-3" />
-              AI Wellness Agent
-            </span>
-          </div>
-          <p className="text-sm text-navy-500">
-            Personalized nutrition guidance based on your wellness patterns.
-          </p>
+      <div>
+        <div className="flex flex-wrap items-center gap-2 mb-1">
+          <h1 className="text-2xl font-bold text-navy-900">Nutri Agent</h1>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+            <Sparkles className="h-3 w-3" />
+            AI Wellness Agent
+          </span>
         </div>
-        <SimulatedBadge className="self-start sm:self-auto shrink-0" />
+        <p className="text-sm text-navy-500">
+          Personalized nutrition guidance based on your wellness patterns.
+        </p>
       </div>
-
-      {/* ── Disclaimer ────────────────────────────────────────────────── */}
-      <DisclaimerBanner />
 
       {/* ── Tabs ──────────────────────────────────────────────────────── */}
       <Tabs defaultValue="chat">

@@ -3,8 +3,6 @@
 import { useSimulation } from "@/lib/simulation/SimulationContext";
 import { cn, formatDeviation } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DisclaimerBanner } from "@/components/layout/Footer";
-import { SimulatedBadge } from "@/components/layout/Toast";
 import { TrendingDown, TrendingUp, Minus } from "lucide-react";
 
 function TrendIcon({ trend }: { trend: string }) {
@@ -52,10 +50,7 @@ export default function SignalsPage() {
           <h1 className="text-2xl font-bold text-navy-900">Feature Analysis</h1>
           <p className="text-sm text-navy-500">Extracted physiological features vs. personal baseline</p>
         </div>
-        <SimulatedBadge />
       </div>
-
-      <DisclaimerBanner />
 
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>

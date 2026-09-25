@@ -1,4 +1,4 @@
-import { Footer, DisclaimerBanner } from "@/components/layout/Footer";
+import { Footer } from "@/components/layout/Footer";
 
 const sections = [
   {
@@ -50,9 +50,7 @@ export default function MethodologyPage() {
         <div>
           <h1 className="text-2xl font-bold text-navy-900">Methodology</h1>
           <p className="text-sm text-navy-500 mt-1">Technical approach and validation roadmap</p>
-          <div className="mt-4">
-            <DisclaimerBanner />
-          </div>
+
         </div>
 
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
