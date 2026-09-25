@@ -274,7 +274,7 @@ export async function fetchAndMapSteps(
         startTimeMillis: String(stepStart),
         endTimeMillis: String(endMs),
       }),
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(4000),
     }
   );
 
@@ -291,7 +291,7 @@ export async function fetchAndMapSteps(
           startTimeMillis: String(stepStart),
           endTimeMillis: String(endMs),
         }),
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(4000),
       }
     );
   }
@@ -359,7 +359,10 @@ export async function fetchAndMapSleep(
   try {
     const res = await fetch(
       `https://www.googleapis.com/fitness/v1/users/me/sessions?startTime=${new Date(startMs).toISOString()}&endTime=${new Date(endMs).toISOString()}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(3000),
+      }
     );
 
     if (res.ok) {
@@ -403,6 +406,7 @@ export async function fetchAndMapSleep(
     try {
       const dsRes = await fetch("https://www.googleapis.com/fitness/v1/users/me/dataSources", {
         headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(3000),
       });
       if (dsRes.ok) {
         const dsData = (await dsRes.json()) as {
@@ -428,20 +432,25 @@ export async function fetchAndMapSleep(
 
     const rawPoints: Array<{ startMs: number; endMs: number; stage: number }> = [];
 
-    // Query in 30-day chunks (Google Fit enforces maximum dataset query window)
+    // Query in 30-day chunks; select top 2 merged/session sources to keep sync under 2 seconds
     const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
     const windows = [
       { start: endMs - THIRTY_DAYS, end: endMs },
-      { start: endMs - 2 * THIRTY_DAYS, end: endMs - THIRTY_DAYS },
     ];
 
-    for (const sourceId of sleepSources) {
+    const preferred = sleepSources.filter((s) => s.includes("merged") || s.includes("session"));
+    const sourcesToQuery = (preferred.length > 0 ? preferred : sleepSources).slice(0, 2);
+
+    for (const sourceId of sourcesToQuery) {
       for (const win of windows) {
         try {
           const datasetId = `${win.start}000000-${win.end}000000`;
           const rawRes = await fetch(
             `https://www.googleapis.com/fitness/v1/users/me/dataSources/${encodeURIComponent(sourceId)}/datasets/${datasetId}`,
-            { headers: { Authorization: `Bearer ${accessToken}` } }
+            {
+              headers: { Authorization: `Bearer ${accessToken}` },
+              signal: AbortSignal.timeout(3000),
+            }
           );
 
           if (rawRes.ok) {
@@ -608,6 +617,7 @@ export async function fetchAndMapNutrition(
     try {
       const dsRes = await fetch("https://www.googleapis.com/fitness/v1/users/me/dataSources", {
         headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(3000),
       });
       if (dsRes.ok) {
         const dsData = (await dsRes.json()) as {
@@ -645,7 +655,10 @@ export async function fetchAndMapNutrition(
         const datasetId = `${nutritionStart}000000-${endMs}000000`;
         const rawRes = await fetch(
           `https://www.googleapis.com/fitness/v1/users/me/dataSources/${encodeURIComponent(sourceId)}/datasets/${datasetId}`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            signal: AbortSignal.timeout(3000),
+          }
         );
         if (rawRes.ok) {
           const rawData = (await rawRes.json()) as {
@@ -732,6 +745,7 @@ export async function fetchAndMapNutrition(
           startTimeMillis: String(nutritionStart),
           endTimeMillis: String(endMs),
         }),
+        signal: AbortSignal.timeout(3000),
       });
 
       if (!aggRes.ok) {
@@ -747,6 +761,7 @@ export async function fetchAndMapNutrition(
             startTimeMillis: String(nutritionStart),
             endTimeMillis: String(endMs),
           }),
+          signal: AbortSignal.timeout(3000),
         });
       }
 

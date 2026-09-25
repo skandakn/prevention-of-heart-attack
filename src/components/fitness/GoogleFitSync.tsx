@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useFitRest } from "@/lib/fit-rest/FitRestContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -143,6 +144,16 @@ export function GoogleFitSync({ variant = "fitness" }: { variant?: GoogleFitVari
     importPhoneNutritionData,
     clearGoogleFitError,
   } = useFitRest();
+
+  const [justSynced, setJustSynced] = useState(false);
+
+  const handleSync = async () => {
+    const ok = await syncGoogleFit();
+    if (ok) {
+      setJustSynced(true);
+      setTimeout(() => setJustSynced(false), 3000);
+    }
+  };
 
   const copy = VARIANT_COPY[variant];
   const gfitWorkoutCount = workoutHistory.filter((w) => w.id.startsWith("gfit_")).length;
@@ -429,12 +440,29 @@ export function GoogleFitSync({ variant = "fitness" }: { variant?: GoogleFitVari
               <Button
                 size="sm"
                 variant="default"
-                onClick={() => void syncGoogleFit()}
+                onClick={() => void handleSync()}
                 disabled={googleFitSyncing}
-                className="gap-1.5"
+                className={cn(
+                  "gap-1.5 transition-all duration-200",
+                  justSynced && "bg-emerald-600 hover:bg-emerald-700 text-white"
+                )}
               >
-                <RefreshCw className={cn("h-3.5 w-3.5", googleFitSyncing && "animate-spin")} />
-                {googleFitSyncing ? "Syncing…" : "Sync Now"}
+                {googleFitSyncing ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    Syncing…
+                  </>
+                ) : justSynced ? (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                    Synced!
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Sync Now
+                  </>
+                )}
               </Button>
               <Button
                 size="sm"

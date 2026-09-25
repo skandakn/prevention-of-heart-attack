@@ -65,7 +65,7 @@ interface FitRestContextValue {
   googleFitSyncing: boolean;
   googleFitError: string | null;
   googleFitNutrition: GoogleFitNutritionData | null;
-  syncGoogleFit: () => Promise<void>;
+  syncGoogleFit: () => Promise<boolean>;
   disconnectGoogleFit: () => void;
   importPhoneSleepData: () => void;
   importPhoneNutritionData: () => void;
@@ -367,10 +367,10 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
 
   // ── Google Fit: sync workouts from the API ─────────────────────────────────
 
-  const syncGoogleFit = useCallback(async () => {
+  const syncGoogleFit = useCallback(async (): Promise<boolean> => {
     if (!googleFitToken) {
       setGoogleFitError("Not connected to Google Fit. Please connect first.");
-      return;
+      return false;
     }
     setGoogleFitSyncing(true);
     setGoogleFitError(null);
@@ -380,6 +380,7 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(googleFitToken),
+        signal: AbortSignal.timeout(8000),
       });
 
       const data = await res.json() as {
@@ -424,23 +425,12 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
         });
       }
 
-      // Persist fresh nutrition data (safeguarding non-zero data if cloud returns 0)
+      // Persist fresh nutrition data
       if (data.nutrition) {
-        setGoogleFitNutrition((prev) => {
-          if (data.nutrition!.today.calories > 0 || data.nutrition!.totalMealsCount > 0) {
-            try {
-              localStorage.setItem(STORAGE_KEYS.NUTRITION_HISTORY, JSON.stringify(data.nutrition));
-            } catch {/* ignore */}
-            return data.nutrition!;
-          }
-          if (prev && (prev.today.calories > 0 || prev.totalMealsCount > 0)) {
-            return prev;
-          }
-          try {
-            localStorage.setItem(STORAGE_KEYS.NUTRITION_HISTORY, JSON.stringify(data.nutrition));
-          } catch {/* ignore */}
-          return data.nutrition!;
-        });
+        setGoogleFitNutrition(data.nutrition);
+        try {
+          localStorage.setItem(STORAGE_KEYS.NUTRITION_HISTORY, JSON.stringify(data.nutrition));
+        } catch {/* ignore */}
       }
 
       // Persist refreshed token if it changed
@@ -475,10 +465,13 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
           }
         }
       }
+
+      return true;
     } catch (err) {
       setGoogleFitError(
         err instanceof Error ? err.message : "Google Fit sync failed. Please try again."
       );
+      return false;
     } finally {
       setGoogleFitSyncing(false);
     }
