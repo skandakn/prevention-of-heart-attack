@@ -38,6 +38,7 @@ import {
   PatientRecordUpdate,
   createEmptyPatientRecord,
 } from "@/lib/patient-record";
+import { useSimulation } from "@/lib/simulation/SimulationContext";
 
 // ─────────────────────── helpers ────────────────────────
 
@@ -297,6 +298,9 @@ function HealthRecordPageContent() {
   const { userId, isLoaded } = useBeatAheadAuth();
   const effectiveUserId = userId || "demo-user-1";
 
+  // Refresh the ISI baseline whenever the health record is saved
+  const { refreshBaseline } = useSimulation();
+
   const [record, setRecord] = useState<PatientRecord>(() =>
     createEmptyPatientRecord(effectiveUserId)
   );
@@ -437,6 +441,8 @@ function HealthRecordPageContent() {
 
       setRecord(saved);
       setLists(toTextLists(saved));
+      // Update ISI baseline immediately from new health data
+      await refreshBaseline();
       if (isOnboarding) {
         router.push("/dashboard");
       } else {

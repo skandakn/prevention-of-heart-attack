@@ -20,7 +20,7 @@ import type {
   SystemStatus,
   TimelineEvent,
 } from "@/lib/isi/types";
-import { DEFAULT_BASELINE } from "@/lib/isi/baseline";
+import { DEFAULT_BASELINE, deriveBaselineFromHealthRecord } from "@/lib/isi/baseline";
 import { extractFeatures } from "@/lib/isi/features";
 import { calculateISI } from "@/lib/isi/scoring";
 import {
@@ -33,6 +33,7 @@ import {
   generateTimeline,
   resetSimulation,
 } from "@/lib/isi/simulation";
+import type { PatientRecord } from "@/lib/patient-record";
 
 interface SimulationData {
   samples: PhysiologicalSample[];
@@ -120,6 +121,10 @@ interface SimulationContextValue extends SimulationState {
   mlServiceStatus: "healthy" | "unavailable" | "evaluating";
   lastEvaluatedAt: string | null;
   evaluateModel: () => Promise<void>;
+  /** Re-fetches the health record and updates the ISI baseline. */
+  refreshBaseline: () => Promise<void>;
+  /** The last fetched PatientRecord (null if not yet loaded). */
+  healthRecord: PatientRecord | null;
 }
 
 const DEFAULT_SETTINGS: SimulationSettings = {
@@ -136,7 +141,43 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
   const [simulationData, setSimulationData] = useState<SimulationData>(() =>
     buildSimulationData("stress_event")
   );
-  const [baseline] = useState<PersonalBaseline>(DEFAULT_BASELINE);
+
+  // ── Health-record-derived baseline ─────────────────────────────────────
+  const [baseline, setBaseline] = useState<PersonalBaseline>(DEFAULT_BASELINE);
+  const [healthRecord, setHealthRecord] = useState<PatientRecord | null>(null);
+
+  const refreshBaseline = useCallback(async () => {
+    try {
+      const res = await fetch("/api/patient-record");
+      if (!res.ok) return;
+      const record: PatientRecord = await res.json();
+      setHealthRecord(record);
+      // Only apply if the record has meaningful clinical data
+      const hasData =
+        record.restingHeartRate !== null ||
+        record.systolicBP !== null ||
+        record.bloodPressureCategory !== "" ||
+        record.smokingStatus !== "" ||
+        record.diabetesStatus !== "" ||
+        record.cholesterolStatus !== "" ||
+        record.stressLevel !== "" ||
+        record.exerciseFrequency !== "" ||
+        record.priorHeartAttack ||
+        record.familyHeartAttack;
+      if (hasData) {
+        setBaseline(deriveBaselineFromHealthRecord(record));
+      }
+    } catch {
+      // silently fall back to DEFAULT_BASELINE
+    }
+  }, []);
+
+  // Fetch on mount
+  useEffect(() => {
+    refreshBaseline();
+  }, [refreshBaseline]);
+  // ──────────────────────────────────────────────────────────────────────
+
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [settings, setSettings] = useState<SimulationSettings>(DEFAULT_SETTINGS);
   
@@ -360,6 +401,8 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
     mlServiceStatus,
     lastEvaluatedAt,
     evaluateModel,
+    refreshBaseline,
+    healthRecord,
   };
 
   return (
