@@ -129,7 +129,6 @@ export function WorkoutPlanCard({
         </div>
 
         {/* Actions */}
-        </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
