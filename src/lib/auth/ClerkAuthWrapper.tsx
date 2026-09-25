@@ -84,8 +84,8 @@ function ClerkAuthBridge({ children }: { children: React.ReactNode }) {
     (demoUserArg?: { email?: string; name?: string; imageUrl?: string }) => {
       const newUser: BeatAheadUser = {
         id: `user_google_${Date.now()}`,
-        fullName: demoUserArg?.name || "Skand Sharma",
-        email: demoUserArg?.email || "skand.sharma@gmail.com",
+        fullName: demoUserArg?.name || "Skanda K N",
+        email: demoUserArg?.email || "skandakn13@gmail.com",
         imageUrl:
           demoUserArg?.imageUrl ||
           "https://lh3.googleusercontent.com/a/ACg8ocIq_placeholder=s96-c",
@@ -151,8 +151,8 @@ function UnconfiguredAuthBridge({ children }: { children: React.ReactNode }) {
     (demoUser?: { email?: string; name?: string; imageUrl?: string }) => {
       const newUser: BeatAheadUser = {
         id: `user_google_${Date.now()}`,
-        fullName: demoUser?.name || "Skand Sharma",
-        email: demoUser?.email || "skand.sharma@gmail.com",
+        fullName: demoUser?.name || "Skanda K N",
+        email: demoUser?.email || "skandakn13@gmail.com",
         imageUrl:
           demoUser?.imageUrl ||
           "https://lh3.googleusercontent.com/a/ACg8ocIq_placeholder=s96-c",

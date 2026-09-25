@@ -22,6 +22,7 @@ const config: Config = {
           700: "#334155",
           800: "#1E293B",
           900: "#0F172A",
+          950: "#030712",
         },
         cardiac: {
           DEFAULT: "#DC2626",
