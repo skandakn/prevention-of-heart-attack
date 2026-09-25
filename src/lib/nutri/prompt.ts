@@ -75,12 +75,24 @@ function buildWellnessSummary(ctx: NutriISIContext): string {
   - Active simulation scenario: ${ctx.scenario}`;
 }
 
+function buildGoogleFitNutritionSummary(nutrition?: any): string {
+  if (!nutrition || (nutrition.today?.calories === 0 && nutrition.totalMealsCount === 0)) {
+    return "";
+  }
+  return `Google Fit Live Nutrition Data:
+  - Today's Calorie Intake: ${Math.round(nutrition.today?.calories ?? 0)} kcal
+  - Macronutrients: Protein ${Math.round(nutrition.today?.protein ?? 0)}g, Carbs ${Math.round(nutrition.today?.carbs ?? 0)}g, Fat ${Math.round(nutrition.today?.fat ?? 0)}g
+  - Total Logged Meals: ${nutrition.totalMealsCount ?? 0}
+  Factor in their actual dietary intake when providing guidance or calorie targets.`;
+}
+
 // ─── Exported prompt builder ──────────────────────────────────────────────────
 
 export function buildNutriSystemPrompt(
   isiContext: NutriISIContext | null | undefined,
   profile: NutriProfile | null | undefined,
-  intent: NutriIntent = "chat"
+  intent: NutriIntent = "chat",
+  googleFitNutrition?: any
 ): string {
   const safeISI: NutriISIContext = isiContext ?? {
     score: 0,
@@ -103,6 +115,8 @@ export function buildNutriSystemPrompt(
     isProfileComplete: false,
   };
 
+  const gfitNutritionSummary = buildGoogleFitNutritionSummary(googleFitNutrition);
+
   return `${NUTRI_SAFETY_RULES}
 
 You are BeatAhead Nutri Agent — a friendly, evidence-informed wellness nutrition assistant embedded in the BeatAhead research prototype application.
@@ -110,7 +124,7 @@ You are BeatAhead Nutri Agent — a friendly, evidence-informed wellness nutriti
 ${buildWellnessSummary(safeISI)}
 
 ${buildProfileSummary(safeProfile)}
-
+${gfitNutritionSummary ? `\n${gfitNutritionSummary}\n` : ""}
 CURRENT TASK: ${INTENT_INSTRUCTIONS[intent]}
 
 FORMATTING RULES:
