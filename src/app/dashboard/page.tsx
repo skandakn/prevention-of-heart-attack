@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { ISITrendChart } from "@/components/charts/ISITrendChart";
 import { ISIGauge } from "@/components/isi/ISIGauge";
@@ -14,7 +15,13 @@ import Link from "next/link";
 import { Heart, PhoneCall, FileText, CreditCard, BookOpen, Info } from "lucide-react";
 
 export default function DashboardPage() {
-  const { settings } = useSimulation();
+  const { settings, pauseMonitoring } = useSimulation();
+
+  // Dashboard always shows a stable ISI score — stop any running simulation
+  useEffect(() => {
+    pauseMonitoring();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-7xl mx-auto">

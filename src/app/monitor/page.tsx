@@ -29,7 +29,11 @@ export default function MonitorPage() {
     if (settings.autoStartMonitoring) {
       startMonitoring();
     }
-    // Auto-start only when entering the monitor page
+    // Auto-start only when entering the monitor page.
+    // Pause automatically when leaving so dashboard ISI stays stable.
+    return () => {
+      pauseMonitoring();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
