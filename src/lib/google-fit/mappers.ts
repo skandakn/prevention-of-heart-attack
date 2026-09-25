@@ -250,89 +250,80 @@ export async function fetchAndMapSteps(
   startMs: number,
   endMs: number
 ): Promise<WorkoutSession[]> {
-  // Step 1: discover what step data sources exist on this account
-  let stepSourceId: string | null = null;
-  let stepDataType = "com.google.step_count.delta";
-
-  try {
-    const dsRes = await fetch(
-      "https://www.googleapis.com/fitness/v1/users/me/dataSources",
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    if (dsRes.ok) {
-      const dsData = await dsRes.json() as {
-        dataSource?: { dataStreamId: string; dataType?: { name: string } }[]
-      };
-      const sources = dsData.dataSource ?? [];
-
-      // Prefer raw delta source, fall back to cumulative (OPPO / some Android phones)
-      const deltaSource = sources.find(s =>
-        s.dataType?.name === "com.google.step_count.delta" && s.dataStreamId.startsWith("raw:")
-      );
-      const cumulativeSource = sources.find(s =>
-        s.dataType?.name === "com.google.step_count.cumulative"
-      );
-
-      if (deltaSource) {
-        stepSourceId = deltaSource.dataStreamId;
-        stepDataType = "com.google.step_count.delta";
-      } else if (cumulativeSource) {
-        stepSourceId = cumulativeSource.dataStreamId;
-        stepDataType = "com.google.step_count.cumulative";
-      }
-    }
-  } catch {
-    // ignore — fall through to generic aggregate
-  }
-
   const sessions: WorkoutSession[] = [];
 
-  // Step 2a: if cumulative source (OPPO-style pedometer), read raw dataset directly
-  // Fetch in 90-day chunks to avoid API limits on nanosecond dataset IDs
-  if (stepSourceId && stepDataType === "com.google.step_count.cumulative") {
-    try {
-      const encodedSource = encodeURIComponent(stepSourceId);
-      const CHUNK_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
-      const byDay = new Map<string, number>();
+  // Use Google's merged step delta source — this aggregates across ALL sensors
+  // (OPPO top_level, estimated_steps, hardware pedometer) automatically.
+  // We try three sources in priority order and use the first that returns data.
+  const SOURCES_TO_TRY = [
+    "derived:com.google.step_count.delta:com.google.android.gms:merge_step_deltas",
+    "derived:com.google.step_count.delta:com.google.android.fit:OPPO:CPH2729:3d280b98:top_level",
+    // Generic fallback — no specific source (Google picks the best available)
+    null,
+  ];
 
-      // Walk backwards from endMs in 90-day chunks
-      let chunkEnd = endMs;
-      while (chunkEnd > startMs) {
-        const chunkStart = Math.max(startMs, chunkEnd - CHUNK_MS);
-        // Dataset IDs use nanoseconds
-        const datasetId = `${chunkStart}000000-${chunkEnd}000000`;
+  // Fetch up to 1 year at a time to avoid API limits
+  const CHUNK_MS = 365 * 86400000;
 
-        const rawRes = await fetch(
-          `https://www.googleapis.com/fitness/v1/users/me/dataSources/${encodedSource}/datasets/${datasetId}`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
+  for (const sourceId of SOURCES_TO_TRY) {
+    const byDay = new Map<string, number>();
+    let anyData = false;
+
+    let chunkEnd = endMs;
+    while (chunkEnd > startMs) {
+      const chunkStart = Math.max(startMs, chunkEnd - CHUNK_MS);
+
+      const aggregateBy = sourceId
+        ? [{ dataTypeName: "com.google.step_count.delta", dataSourceId: sourceId }]
+        : [{ dataTypeName: "com.google.step_count.delta" }];
+
+      try {
+        const res = await fetch(
+          "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate",
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              aggregateBy,
+              bucketByTime: { durationMillis: "86400000" },
+              startTimeMillis: String(chunkStart),
+              endTimeMillis: String(chunkEnd),
+            }),
+          }
         );
 
-        if (rawRes.ok) {
-          const rawData = await rawRes.json() as {
-            point?: {
-              startTimeNanos: string;
-              endTimeNanos: string;
-              value?: { intVal?: number }[]
-            }[]
-          };
-
-          // OPPO cumulative pedometer resets at midnight each day.
-          // Take the MAX value seen in each day — that's the day's total steps.
-          for (const point of rawData.point ?? []) {
-            const dayMs = Number(BigInt(point.startTimeNanos) / BigInt(1_000_000));
-            const dateStr = new Date(dayMs).toISOString().split("T")[0];
-            const val = point.value?.[0]?.intVal ?? 0;
-            // Take the maximum reading of the day (last reading = total for day)
-            const existing = byDay.get(dateStr) ?? 0;
-            if (val > existing) byDay.set(dateStr, val);
-          }
-        } else {
-          console.error(`[GFit Steps] Raw dataset chunk failed: ${rawRes.status}`);
+        if (!res.ok) {
+          console.error(`[GFit Steps] Aggregate failed (source=${sourceId ?? "generic"}): ${res.status}`);
+          break; // try next source
         }
 
-        chunkEnd = chunkStart - 1;
+        const data = await res.json() as { bucket?: { startTimeMillis: string; dataset?: { point?: { value?: { intVal?: number }[] }[] }[] }[] };
+        for (const bucket of data.bucket ?? []) {
+          const bucketStartMs = Number(bucket.startTimeMillis);
+          const dateStr = new Date(bucketStartMs).toISOString().split("T")[0];
+          let totalSteps = 0;
+          for (const ds of bucket.dataset ?? []) {
+            for (const point of ds.point ?? []) {
+              for (const val of point.value ?? []) {
+                totalSteps += val.intVal ?? 0;
+              }
+            }
+          }
+          if (totalSteps > 0) {
+            anyData = true;
+            byDay.set(dateStr, (byDay.get(dateStr) ?? 0) + totalSteps);
+          }
+        }
+      } catch (e) {
+        console.error("[GFit Steps] Aggregate error:", e);
+        break;
       }
 
+      chunkEnd = chunkStart - 1;
+    }
+
+    if (anyData) {
+      // This source worked — build sessions and return
       for (const [dateStr, steps] of byDay.entries()) {
         if (steps < MIN_STEPS_THRESHOLD) continue;
         sessions.push({
@@ -345,83 +336,12 @@ export async function fetchAndMapSteps(
           isDemoData: false,
         } satisfies WorkoutSession);
       }
-    } catch (e) {
-      console.error("[GFit Steps] Raw cumulative fetch failed:", e);
+      return sessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
-
-    return sessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // Otherwise try next source
   }
 
-  // Step 2b: use aggregate API for delta sources (or generic fallback)
-  const aggregateBy = stepSourceId
-    ? [{ dataTypeName: stepDataType, dataSourceId: stepSourceId }]
-    : [{ dataTypeName: "com.google.step_count.delta" }];
-
-  const stepStart = Math.max(startMs, endMs - 60 * 86400000);
-
-  let aggRes = await fetch(
-    "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate",
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        aggregateBy,
-        bucketByTime: { durationMillis: "86400000" },
-        startTimeMillis: String(stepStart),
-        endTimeMillis: String(endMs),
-      }),
-      signal: AbortSignal.timeout(4000),
-    }
-  );
-
-  // If specific source failed, retry without specifying a source
-  if (!aggRes.ok && stepSourceId) {
-    aggRes = await fetch(
-      "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate",
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          aggregateBy: [{ dataTypeName: "com.google.step_count.delta" }],
-          bucketByTime: { durationMillis: "86400000" },
-          startTimeMillis: String(stepStart),
-          endTimeMillis: String(endMs),
-        }),
-        signal: AbortSignal.timeout(4000),
-      }
-    );
-  }
-
-  if (!aggRes.ok) {
-    console.error(`[GFit Steps] Aggregate fetch failed: ${aggRes.status}`);
-    return sessions;
-  }
-
-  const data = (await aggRes.json()) as AggregateResponse;
-  for (const bucket of data.bucket ?? []) {
-    const bucketStartMs = Number(bucket.startTimeMillis);
-    const dateStr = new Date(bucketStartMs).toISOString().split("T")[0];
-    let totalSteps = 0;
-    for (const ds of bucket.dataset ?? []) {
-      for (const point of ds.point ?? []) {
-        for (const val of point.value ?? []) {
-          totalSteps += val.intVal ?? 0;
-        }
-      }
-    }
-    if (totalSteps < MIN_STEPS_THRESHOLD) continue;
-    sessions.push({
-      id: `gfit_steps_${dateStr}`,
-      date: dateStr,
-      type: "walking" as ExerciseType,
-      durationMinutes: stepsToDurationMinutes(totalSteps),
-      intensity: stepsToIntensity(totalSteps),
-      notes: `${totalSteps.toLocaleString()} steps · Imported from Google Fit`,
-      isDemoData: false,
-    } satisfies WorkoutSession);
-  }
-
-  return sessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return sessions; // all sources returned empty
 }
 
 // ─── Sleep session fetching & mapping ────────────────────────────────────────
