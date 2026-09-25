@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNutri } from "@/lib/nutri/NutriContext";
 import { useFitRest } from "@/lib/fit-rest/FitRestContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -24,9 +24,18 @@ export function DailyPlan({ isiContext }: DailyPlanProps) {
   const [localLoading, setLocalLoading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
+  // Restore cached plan on mount so user doesn't wait every time
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem("beatahead-daily-plan");
+      if (cached) {
+        setPlan((prev) => prev ?? cached);
+      }
+    } catch {}
+  }, []);
+
   async function generatePlan() {
     if (localLoading || isLoading) return;
-    setPlan(null);
     setLocalError(null);
     setLocalLoading(true);
 
@@ -54,6 +63,7 @@ export function DailyPlan({ isiContext }: DailyPlanProps) {
           intent: "daily_plan",
           googleFitNutrition: gfitNutritionPayload,
         }),
+        signal: AbortSignal.timeout(10000),
       });
 
       if (!res.ok) {
@@ -62,7 +72,11 @@ export function DailyPlan({ isiContext }: DailyPlanProps) {
       }
 
       const data = await res.json();
-      setPlan(data.responseText || "No plan received.");
+      const outputPlan = data.responseText || "No plan received.";
+      setPlan(outputPlan);
+      try {
+        localStorage.setItem("beatahead-daily-plan", outputPlan);
+      } catch {}
     } catch (err: unknown) {
       setLocalError(
         err instanceof Error ? err.message : "An error occurred. Please try again."

@@ -380,7 +380,7 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(googleFitToken),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(15000),
       });
 
       const data = await res.json() as {
@@ -467,9 +467,16 @@ export function FitRestProvider({ children }: { children: React.ReactNode }) {
       }
 
       return true;
-    } catch (err) {
+    } catch (err: unknown) {
+      const isTimeout =
+        err instanceof Error &&
+        (err.name === "TimeoutError" || err.message.toLowerCase().includes("timed out"));
       setGoogleFitError(
-        err instanceof Error ? err.message : "Google Fit sync failed. Please try again."
+        isTimeout
+          ? "Sync request timed out. Please check your connection and tap Sync Now again."
+          : err instanceof Error
+          ? err.message
+          : "Google Fit sync failed. Please try again."
       );
       return false;
     } finally {
