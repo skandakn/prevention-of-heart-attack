@@ -8,12 +8,14 @@ import { BaselineCard } from "@/components/isi/BaselineCard";
 import { RiskTrendBanner } from "@/components/isi/RiskTrendBanner";
 import { ContributionBars } from "@/components/isi/ContributionBars";
 import { useSimulation } from "@/lib/simulation/SimulationContext";
+import { useTour } from "@/lib/tour/TourContext";
 import { ISI_RANGE_LABELS } from "@/lib/isi/types";
 import Link from "next/link";
-import { Heart, PhoneCall, FileText, CreditCard, BookOpen, Info } from "lucide-react";
+import { Heart, PhoneCall, FileText, CreditCard, BookOpen, Info, Compass } from "lucide-react";
 
 export default function DashboardPage() {
   const { settings, pauseMonitoring } = useSimulation();
+  const { startTour } = useTour();
 
   // Dashboard always shows a stable ISI score — stop any running simulation
   useEffect(() => {
@@ -84,6 +86,14 @@ export default function DashboardPage() {
               Quick Links
             </h3>
             <div className="space-y-2">
+              <button
+                type="button"
+                onClick={startTour}
+                className="flex items-center gap-2 text-sm text-navy-600 hover:text-navy-900 transition-colors"
+              >
+                <Compass className="w-3.5 h-3.5" />
+                Start Guided Tour
+              </button>
               <Link
                 href="/helpline"
                 className="flex items-center gap-2 text-sm text-navy-600 hover:text-navy-900 transition-colors"
