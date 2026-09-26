@@ -52,6 +52,9 @@ export interface PatientRecord {
   restingHeartRate: number | null;
   bloodPressureCategory: BloodPressureCategory;
   cholesterolStatus: CholesterolStatus;
+  // ECG & PPG (cardiac signal readings)
+  ecgValue: number | null;       // ECG amplitude in mV (typical range 0.1–5.0 mV)
+  ppgValue: number | null;       // PPG amplitude in arbitrary units (0–1023 typical)
   // Medical history
   conditions: string[];
   medications: string[];
@@ -100,6 +103,8 @@ export function createEmptyPatientRecord(userId: string, timestamp = new Date().
     restingHeartRate: null,
     bloodPressureCategory: "",
     cholesterolStatus: "",
+    ecgValue: null,
+    ppgValue: null,
     conditions: [],
     medications: [],
     allergies: [],
@@ -184,6 +189,8 @@ export function validatePatientRecordUpdate(value: unknown): PatientRecordUpdate
     restingHeartRate: optionalMeasurement(input.restingHeartRate, "Resting heart rate", 1, 300),
     bloodPressureCategory: optionalEnum(input.bloodPressureCategory, "Blood pressure", BLOOD_PRESSURE_OPTIONS),
     cholesterolStatus: optionalEnum(input.cholesterolStatus, "Cholesterol status", CHOLESTEROL_STATUS_OPTIONS),
+    ecgValue: optionalMeasurement(input.ecgValue, "ECG value", 0, 99999),
+    ppgValue: optionalMeasurement(input.ppgValue, "PPG value", 0, 99999),
     conditions: stringList(input.conditions, "Conditions"),
     medications: stringList(input.medications, "Medications"),
     allergies: stringList(input.allergies, "Allergies"),

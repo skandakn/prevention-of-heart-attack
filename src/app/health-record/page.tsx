@@ -411,6 +411,8 @@ function HealthRecordPageContent() {
     restingHeartRate: record.restingHeartRate,
     bloodPressureCategory: record.bloodPressureCategory,
     cholesterolStatus: record.cholesterolStatus,
+    ecgValue: record.ecgValue,
+    ppgValue: record.ppgValue,
     conditions: fromLines(lists.conditions),
     medications: fromLines(lists.medications),
     allergies: fromLines(lists.allergies),
@@ -807,6 +809,49 @@ function HealthRecordPageContent() {
                       onChange={(v) => field("bloodPressureCategory", v as PatientRecord["bloodPressureCategory"])}
                       icon={<Activity className="w-4 h-4" />}
                     />
+                  </div>
+                </div>
+
+                {/* ECG & PPG */}
+                <div className={`${glass} p-6`}>
+                  <div className="flex items-center gap-2.5 mb-6">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/20 flex items-center justify-center">
+                      <HeartPulse className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-white">ECG & PPG Readings</h2>
+                      <p className="text-[11px] text-white/30">Cardiac signal values from a wearable or device</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <NumberField
+                      label="ECG Amplitude"
+                      value={record.ecgValue}
+                      onChange={(v) => field("ecgValue", v)}
+                      disabled={isLoading}
+                      placeholder="e.g. 1.2"
+                      min={0} max={99999}
+                      unit="mV"
+                      icon={<Activity className="w-4 h-4" />}
+                    />
+                    <NumberField
+                      label="PPG Value"
+                      value={record.ppgValue}
+                      onChange={(v) => field("ppgValue", v)}
+                      disabled={isLoading}
+                      placeholder="e.g. 512"
+                      min={0} max={99999}
+                      unit="AU"
+                      icon={<HeartPulse className="w-4 h-4" />}
+                    />
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-blue-500/15 bg-blue-500/5 px-4 py-3">
+                    <p className="text-[11px] text-blue-300/70 leading-relaxed">
+                      <span className="font-semibold text-blue-300/90">ECG</span> (Electrocardiogram) measures electrical activity of the heart in millivolts.{" "}
+                      <span className="font-semibold text-blue-300/90">PPG</span> (Photoplethysmography) measures blood volume changes via a light sensor — typical range 0–1023 depending on your device.
+                    </p>
                   </div>
                 </div>
 
