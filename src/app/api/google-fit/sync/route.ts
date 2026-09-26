@@ -122,12 +122,62 @@ export async function POST(request: Request) {
       return [];
     }),
 
-    // 2. Daily step counts (passive tracking, 60 days) — with 8s timeout
+    // 2. Daily step counts — inline implementation to bypass any issues in fetchAndMapSteps
     Promise.race([
-      fetchAndMapSteps(access_token, now - SIXTY_DAYS, now).then(steps => {
-        console.log(`[GFit Sync] fetchAndMapSteps returned ${steps.length} entries`);
-        return steps;
-      }),
+      (async (): Promise<WorkoutSession[]> => {
+        const stepRes = await fetch(
+          "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate",
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${access_token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              aggregateBy: [{ dataTypeName: "com.google.step_count.delta" }],
+              bucketByTime: { durationMillis: "86400000" },
+              startTimeMillis: String(now - SIXTY_DAYS),
+              endTimeMillis: String(now),
+            }),
+            signal: AbortSignal.timeout(7000),
+          }
+        );
+        if (!stepRes.ok) {
+          console.error(`[GFit Steps inline] HTTP ${stepRes.status}`);
+          return [];
+        }
+        const stepData = await stepRes.json() as {
+          bucket?: {
+            startTimeMillis: string;
+            dataset?: { point?: { value?: { intVal?: number }[] }[] }[]
+          }[]
+        };
+        const buckets = stepData.bucket ?? [];
+        const stepSessions: WorkoutSession[] = [];
+        console.log(`[GFit Steps inline] ${buckets.length} buckets total`);
+        for (const bucket of buckets) {
+          let total = 0;
+          for (const ds of bucket.dataset ?? []) {
+            for (const pt of ds.point ?? []) {
+              for (const v of pt.value ?? []) total += v.intVal ?? 0;
+            }
+          }
+          if (total <= 0) continue;
+          // Use bucket startTimeMillis directly — already in ms
+          const bucketMs = Number(bucket.startTimeMillis);
+          const dateStr = new Date(bucketMs).toISOString().split("T")[0];
+          console.log(`[GFit Steps inline] ${dateStr}: ${total} steps`);
+          if (total < 500) continue; // low threshold
+          stepSessions.push({
+            id: `gfit_steps_${dateStr}`,
+            date: dateStr,
+            type: "walking" as WorkoutSession["type"],
+            durationMinutes: Math.max(1, Math.round(total / 100)),
+            intensity: total < 3000 ? "light" : total < 8000 ? "moderate" : "intense",
+            notes: `${total.toLocaleString()} steps · Imported from Google Fit`,
+            isDemoData: false,
+          });
+        }
+        console.log(`[GFit Steps inline] ${stepSessions.length} step sessions created`);
+        return stepSessions;
+      })(),
       new Promise<WorkoutSession[]>((_, reject) =>
         setTimeout(() => reject(new Error("steps_timeout")), 8000)
       ),
