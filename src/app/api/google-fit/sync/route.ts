@@ -124,7 +124,10 @@ export async function POST(request: Request) {
 
     // 2. Daily step counts (passive tracking, 60 days) — with 8s timeout
     Promise.race([
-      fetchAndMapSteps(access_token, now - SIXTY_DAYS, now),
+      fetchAndMapSteps(access_token, now - SIXTY_DAYS, now).then(steps => {
+        console.log(`[GFit Sync] fetchAndMapSteps returned ${steps.length} entries`);
+        return steps;
+      }),
       new Promise<WorkoutSession[]>((_, reject) =>
         setTimeout(() => reject(new Error("steps_timeout")), 8000)
       ),

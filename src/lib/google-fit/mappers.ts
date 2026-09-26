@@ -283,7 +283,10 @@ export async function fetchAndMapSteps(
             dataset?: { point?: { value?: { intVal?: number }[] }[] }[]
           }[]
         };
-        for (const bucket of data.bucket ?? []) {
+        const buckets = data.bucket ?? [];
+        const bucketsWithData = buckets.filter(b => b.dataset?.some(ds => (ds.point?.length ?? 0) > 0));
+        console.log(`[GFit Steps] chunk ${new Date(chunkStart).toISOString().split("T")[0]} to ${new Date(chunkEnd).toISOString().split("T")[0]}: ${buckets.length} buckets, ${bucketsWithData.length} with data`);
+        for (const bucket of buckets) {
           const dateStr = new Date(Number(bucket.startTimeMillis)).toISOString().split("T")[0];
           let total = 0;
           for (const ds of bucket.dataset ?? []) {
