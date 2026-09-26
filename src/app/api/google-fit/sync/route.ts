@@ -5,6 +5,7 @@ import {
   fetchAndMapSleep,
   fetchAndMapNutrition,
 } from "@/lib/google-fit/mappers";
+import type { WorkoutSession } from "@/lib/fit-rest/types";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SESSIONS_URL = "https://www.googleapis.com/fitness/v1/users/me/sessions";
@@ -121,8 +122,13 @@ export async function POST(request: Request) {
       return [];
     }),
 
-    // 2. Daily step counts (passive tracking, 60 days)
-    fetchAndMapSteps(access_token, now - SIXTY_DAYS, now),
+    // 2. Daily step counts (passive tracking, 60 days) — with 8s timeout
+    Promise.race([
+      fetchAndMapSteps(access_token, now - SIXTY_DAYS, now),
+      new Promise<WorkoutSession[]>((_, reject) =>
+        setTimeout(() => reject(new Error("steps_timeout")), 8000)
+      ),
+    ]),
 
     // 3. Sleep sessions (activityType 72 + bedtime tracking, 60 days)
     fetchAndMapSleep(access_token, now - SIXTY_DAYS, now),
@@ -149,7 +155,10 @@ export async function POST(request: Request) {
 
   const syncErrors: string[] = [];
   if (sessionsRes.status === "rejected") syncErrors.push("sessions");
-  if (stepsRes.status === "rejected") syncErrors.push("steps");
+  if (stepsRes.status === "rejected") {
+    syncErrors.push("steps");
+    console.error("[GFit Sync] Steps fetch failed:", stepsRes.reason);
+  }
   if (sleepRes.status === "rejected") syncErrors.push("sleep");
   if (nutritionRes.status === "rejected") syncErrors.push("nutrition");
 
@@ -237,9 +246,11 @@ export async function POST(request: Request) {
     success: true,
     workouts,
     workoutCount: workouts.length,
+    stepCount: workouts.filter((w: { id: string }) => w.id.startsWith("gfit_steps_")).length,
     sleepSessions,
     sleepCount: sleepSessions.length,
     nutrition,
+    syncErrors,
     token: {
       access_token,
       refresh_token: refresh_token ?? null,
