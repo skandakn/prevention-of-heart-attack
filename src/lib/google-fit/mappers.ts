@@ -250,69 +250,61 @@ export async function fetchAndMapSteps(
   startMs: number,
   endMs: number
 ): Promise<WorkoutSession[]> {
-  // Query ALL step sources and merge by taking the max per day.
-  // This ensures we get steps from whichever source has the most complete data.
-  const SOURCES_TO_TRY = [
-    "derived:com.google.step_count.delta:com.google.android.gms:merge_step_deltas",
-    "derived:com.google.step_count.delta:com.google.android.fit:OPPO:CPH2729:3d280b98:top_level",
-    null, // generic — no specific source (Google picks best available)
-  ];
-
+  // Query step counts using the generic dataTypeName only — Google automatically
+  // returns the best aggregated source (com.google.android.gms:aggregated) which
+  // merges all sources including OPPO cumulative pedometers.
   const CHUNK_MS = 365 * 86400000; // 1 year per API call
-  const byDay = new Map<string, number>(); // date → max steps seen across sources
+  const byDay = new Map<string, number>();
 
-  for (const sourceId of SOURCES_TO_TRY) {
-    let chunkEnd = endMs;
-    while (chunkEnd > startMs) {
-      const chunkStart = Math.max(startMs, chunkEnd - CHUNK_MS);
-      const aggregateBy = sourceId
-        ? [{ dataTypeName: "com.google.step_count.delta", dataSourceId: sourceId }]
-        : [{ dataTypeName: "com.google.step_count.delta" }];
+  let chunkEnd = endMs;
+  while (chunkEnd > startMs) {
+    const chunkStart = Math.max(startMs, chunkEnd - CHUNK_MS);
 
-      try {
-        const res = await fetch(
-          "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate",
-          {
-            method: "POST",
-            headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              aggregateBy,
-              bucketByTime: { durationMillis: "86400000" },
-              startTimeMillis: String(chunkStart),
-              endTimeMillis: String(chunkEnd),
-            }),
+    try {
+      const res = await fetch(
+        "https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            // No dataSourceId — let Google pick the aggregated source automatically
+            aggregateBy: [{ dataTypeName: "com.google.step_count.delta" }],
+            bucketByTime: { durationMillis: "86400000" },
+            startTimeMillis: String(chunkStart),
+            endTimeMillis: String(chunkEnd),
+          }),
+        }
+      );
+
+      if (res.ok) {
+        const data = await res.json() as {
+          bucket?: {
+            startTimeMillis: string;
+            dataset?: { point?: { value?: { intVal?: number }[] }[] }[]
+          }[]
+        };
+        for (const bucket of data.bucket ?? []) {
+          const dateStr = new Date(Number(bucket.startTimeMillis)).toISOString().split("T")[0];
+          let total = 0;
+          for (const ds of bucket.dataset ?? []) {
+            for (const pt of ds.point ?? []) {
+              for (const v of pt.value ?? []) total += v.intVal ?? 0;
+            }
           }
-        );
-
-        if (res.ok) {
-          const data = await res.json() as {
-            bucket?: {
-              startTimeMillis: string;
-              dataset?: { point?: { value?: { intVal?: number }[] }[] }[]
-            }[]
-          };
-          for (const bucket of data.bucket ?? []) {
-            const dateStr = new Date(Number(bucket.startTimeMillis)).toISOString().split("T")[0];
-            let total = 0;
-            for (const ds of bucket.dataset ?? []) {
-              for (const pt of ds.point ?? []) {
-                for (const v of pt.value ?? []) total += v.intVal ?? 0;
-              }
-            }
-            if (total > 0) {
-              // Keep the maximum across all sources for this day
-              byDay.set(dateStr, Math.max(byDay.get(dateStr) ?? 0, total));
-            }
+          if (total > 0) {
+            byDay.set(dateStr, Math.max(byDay.get(dateStr) ?? 0, total));
           }
         }
-      } catch {
-        // non-fatal — continue to next source
+      } else {
+        console.error(`[GFit Steps] Aggregate failed: ${res.status}`);
       }
-      chunkEnd = chunkStart - 1;
+    } catch (e) {
+      console.error("[GFit Steps] Aggregate error:", e);
     }
+
+    chunkEnd = chunkStart - 1;
   }
 
-  // Convert to WorkoutSession entries
   const sessions: WorkoutSession[] = [];
   for (const [dateStr, steps] of byDay.entries()) {
     if (steps < MIN_STEPS_THRESHOLD) continue;
