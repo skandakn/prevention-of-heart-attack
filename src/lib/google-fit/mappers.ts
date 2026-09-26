@@ -250,29 +250,21 @@ export async function fetchAndMapSteps(
   startMs: number,
   endMs: number
 ): Promise<WorkoutSession[]> {
-  const sessions: WorkoutSession[] = [];
-
-  // Use Google's merged step delta source — this aggregates across ALL sensors
-  // (OPPO top_level, estimated_steps, hardware pedometer) automatically.
-  // We try three sources in priority order and use the first that returns data.
+  // Query ALL step sources and merge by taking the max per day.
+  // This ensures we get steps from whichever source has the most complete data.
   const SOURCES_TO_TRY = [
     "derived:com.google.step_count.delta:com.google.android.gms:merge_step_deltas",
     "derived:com.google.step_count.delta:com.google.android.fit:OPPO:CPH2729:3d280b98:top_level",
-    // Generic fallback — no specific source (Google picks the best available)
-    null,
+    null, // generic — no specific source (Google picks best available)
   ];
 
-  // Fetch up to 1 year at a time to avoid API limits
-  const CHUNK_MS = 365 * 86400000;
+  const CHUNK_MS = 365 * 86400000; // 1 year per API call
+  const byDay = new Map<string, number>(); // date → max steps seen across sources
 
   for (const sourceId of SOURCES_TO_TRY) {
-    const byDay = new Map<string, number>();
-    let anyData = false;
-
     let chunkEnd = endMs;
     while (chunkEnd > startMs) {
       const chunkStart = Math.max(startMs, chunkEnd - CHUNK_MS);
-
       const aggregateBy = sourceId
         ? [{ dataTypeName: "com.google.step_count.delta", dataSourceId: sourceId }]
         : [{ dataTypeName: "com.google.step_count.delta" }];
@@ -292,56 +284,49 @@ export async function fetchAndMapSteps(
           }
         );
 
-        if (!res.ok) {
-          console.error(`[GFit Steps] Aggregate failed (source=${sourceId ?? "generic"}): ${res.status}`);
-          break; // try next source
-        }
-
-        const data = await res.json() as { bucket?: { startTimeMillis: string; dataset?: { point?: { value?: { intVal?: number }[] }[] }[] }[] };
-        for (const bucket of data.bucket ?? []) {
-          const bucketStartMs = Number(bucket.startTimeMillis);
-          const dateStr = new Date(bucketStartMs).toISOString().split("T")[0];
-          let totalSteps = 0;
-          for (const ds of bucket.dataset ?? []) {
-            for (const point of ds.point ?? []) {
-              for (const val of point.value ?? []) {
-                totalSteps += val.intVal ?? 0;
+        if (res.ok) {
+          const data = await res.json() as {
+            bucket?: {
+              startTimeMillis: string;
+              dataset?: { point?: { value?: { intVal?: number }[] }[] }[]
+            }[]
+          };
+          for (const bucket of data.bucket ?? []) {
+            const dateStr = new Date(Number(bucket.startTimeMillis)).toISOString().split("T")[0];
+            let total = 0;
+            for (const ds of bucket.dataset ?? []) {
+              for (const pt of ds.point ?? []) {
+                for (const v of pt.value ?? []) total += v.intVal ?? 0;
               }
             }
-          }
-          if (totalSteps > 0) {
-            anyData = true;
-            byDay.set(dateStr, (byDay.get(dateStr) ?? 0) + totalSteps);
+            if (total > 0) {
+              // Keep the maximum across all sources for this day
+              byDay.set(dateStr, Math.max(byDay.get(dateStr) ?? 0, total));
+            }
           }
         }
-      } catch (e) {
-        console.error("[GFit Steps] Aggregate error:", e);
-        break;
+      } catch {
+        // non-fatal — continue to next source
       }
-
       chunkEnd = chunkStart - 1;
     }
-
-    if (anyData) {
-      // This source worked — build sessions and return
-      for (const [dateStr, steps] of byDay.entries()) {
-        if (steps < MIN_STEPS_THRESHOLD) continue;
-        sessions.push({
-          id: `gfit_steps_${dateStr}`,
-          date: dateStr,
-          type: "walking" as ExerciseType,
-          durationMinutes: stepsToDurationMinutes(steps),
-          intensity: stepsToIntensity(steps),
-          notes: `${steps.toLocaleString()} steps · Imported from Google Fit`,
-          isDemoData: false,
-        } satisfies WorkoutSession);
-      }
-      return sessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }
-    // Otherwise try next source
   }
 
-  return sessions; // all sources returned empty
+  // Convert to WorkoutSession entries
+  const sessions: WorkoutSession[] = [];
+  for (const [dateStr, steps] of byDay.entries()) {
+    if (steps < MIN_STEPS_THRESHOLD) continue;
+    sessions.push({
+      id: `gfit_steps_${dateStr}`,
+      date: dateStr,
+      type: "walking" as ExerciseType,
+      durationMinutes: stepsToDurationMinutes(steps),
+      intensity: stepsToIntensity(steps),
+      notes: `${steps.toLocaleString()} steps · Imported from Google Fit`,
+      isDemoData: false,
+    } satisfies WorkoutSession);
+  }
+  return sessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 // ─── Sleep session fetching & mapping ────────────────────────────────────────
